@@ -1,0 +1,3 @@
+config BOARD_ULTIPARC_SIM
+	bool "Ultiparc simulator target"
+	depends on SOC_ULTIPARC_RTL

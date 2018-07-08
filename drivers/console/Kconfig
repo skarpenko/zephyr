@@ -283,6 +283,15 @@ config XTENSA_SIM_CONSOLE
 	help
 	  Use simulator console to print messages.
 
+config ULTIPARC_CONSOLE
+	bool
+	prompt "Use Ultiparc console for output"
+	depends on SOC_ULTIPARC_RTL
+	select CONSOLE_HAS_DRIVER
+	default y
+	help
+	  Use Ultiparc console to print messages.
+
 config NATIVE_POSIX_CONSOLE
 	bool
 	prompt "Use native stdin/stdout for console"
@@ -331,6 +340,23 @@ config XTENSA_CONSOLE_INIT_PRIORITY
 	depends on XTENSA_SIM_CONSOLE
 	help
 	  Device driver initialization priority.
+
+config ULTIPARC_CONSOLE_INIT_PRIORITY
+	int
+	prompt "Ultiparc console init priority"
+	default 60
+	depends on ULTIPARC_CONSOLE
+	help
+	  Device driver initialization priority.
+
+config ULTIPARC_CONSOLE_BASE_ADDRESS
+	hex
+	prompt "Ultiparc console base address"
+	default 0x80000000
+	depends on SOC_ULTIPARC_RTL
+	depends on ULTIPARC_CONSOLE
+	help
+	  Base I/O address for Ultiparc Micro UART.
 
 config NATIVE_POSIX_CONSOLE_INIT_PRIORITY
 	int

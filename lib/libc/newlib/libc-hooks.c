@@ -39,6 +39,10 @@ static unsigned char __kernel __aligned(CONFIG_NEWLIB_LIBC_ALIGNED_HEAP_SIZE)
 #elif CONFIG_XTENSA
 extern void *_heap_sentry;
 #define MAX_HEAP_SIZE  (POINTER_TO_UINT(&_heap_sentry) - USED_RAM_END_ADDR)
+#elif CONFIG_ULTIPARC
+#include <soc.h>
+#define USED_RAM_SIZE  (USED_RAM_END_ADDR - ULTIPARC_RAM_BASE)
+#define MAX_HEAP_SIZE  (ULTIPARC_RAM_SIZE - USED_RAM_SIZE)
 #else
 #define USED_RAM_SIZE  (USED_RAM_END_ADDR - CONFIG_SRAM_BASE_ADDRESS)
 #define MAX_HEAP_SIZE ((KB(CONFIG_SRAM_SIZE)) - USED_RAM_SIZE)

@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+if SOC_ULTIPARC_RTL
+
+config ULTIPARC_ICTL
+	bool "Ultiparc interrupt controller"
+	default n
+	help
+	 Enable Ultiparc interrupt controller driver.
+
+config ULTIPARC_ICTL_BASE_ADDRESS
+	hex "Ultiparc interrupt controller base address"
+	default 0x80200000
+	depends on ULTIPARC_ICTL
+	help
+	  This options specifies the base I/O address of the Ultiparc
+	  interrupt controller.
+
+endif # SOC_ULTIPARC_RTL

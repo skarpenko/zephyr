@@ -1,0 +1,36 @@
+#
+# Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+choice
+	prompt "Ultiparc configuration selection"
+	depends on ULTIPARC
+	gsource "arch/ultiparc/soc/*/Kconfig.soc"
+endchoice
+
+menu "Ultiparc Options"
+	depends on ULTIPARC
+
+config ARCH
+	string
+	default "ultiparc"
+
+config ARCH_DEFCONFIG
+	string
+	default "arch/ultiparc/defconfig"
+
+menu "Ultiparc Processor Options"
+
+config GEN_ISR_TABLES
+	default y
+
+config GEN_IRQ_VECTOR_TABLE
+	default n
+
+endmenu
+
+gsource "arch/ultiparc/soc/*/Kconfig"
+
+endmenu

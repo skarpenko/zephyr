@@ -1,0 +1,9 @@
+if BOARD_ULTIPARC_SIM
+
+config BUILD_OUTPUT_BIN
+        default y
+
+config BOARD
+	default "ultiparc-sim"
+
+endif

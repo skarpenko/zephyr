@@ -34,6 +34,9 @@
 	OUTPUT_FORMAT("elf32-littleriscv")
 #elif defined(CONFIG_XTENSA)
 	/* Not needed */
+#elif defined(CONFIG_ULTIPARC)
+	OUTPUT_ARCH("mips")
+	OUTPUT_FORMAT("elf32-littlemips", "elf32-bigmips", "elf32-littlemips")
 #elif defined(CONFIG_ARCH_POSIX)
 	/* Not needed */
 #else

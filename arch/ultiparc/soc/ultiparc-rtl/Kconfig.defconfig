@@ -1,0 +1,23 @@
+if SOC_ULTIPARC_RTL
+
+config SOC
+	string
+	default "ultiparc-rtl"
+
+config SYS_CLOCK_HW_CYCLES_PER_SEC
+	int
+	default 5000000
+
+config NUM_IRQS
+	int
+	default 32
+
+config RAM_BASE
+	hex
+	default	0x00000000
+
+config RAM_SIZE
+	hex
+	default 0x40000
+
+endif # SOC_ULTIPARC_RTL

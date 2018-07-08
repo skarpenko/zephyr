@@ -78,6 +78,10 @@
 	  defined(CONFIG_XTENSA)
     #define PERFOPT_ALIGN .balign 4
 
+  #elif defined(CONFIG_ULTIPARC)
+
+    #define PERFOPT_ALIGN .balign  4
+
   #elif defined(CONFIG_ARCH_POSIX)
 
   #else

@@ -1,0 +1,12 @@
+identifier: ultiparc-sim
+name: Ultiparc Simulator
+type: sim
+simulation: sim
+arch: ultiparc
+toolchain:
+  - zephyr
+testing:
+  default: true
+  ignore_tags:
+    - net
+    - bluetooth

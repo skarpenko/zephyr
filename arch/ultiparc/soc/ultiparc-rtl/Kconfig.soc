@@ -1,0 +1,2 @@
+config SOC_ULTIPARC_RTL
+	bool "Ultiparc RTL SOC implementation"
