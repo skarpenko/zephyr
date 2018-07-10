@@ -1,1 +1,86 @@
-//TODO: TBD
+ZEPHYR FOR ULTIPARC
+===================
+
+Follow official Zephyr Project documentation pages and install all requirements
+and dependencies.
+
+Zephyr Project Documentation:
+    http://docs.zephyrproject.org/getting_started/getting_started.html
+
+
+
+Development Environment Setup on Linux
+--------------------------------------
+
+Export the following environment variables and use the target location where
+MIPS-I toolchain was installed:
+
+    # On Linux
+    export ZEPHYR_TOOLCHAIN_VARIANT=ultiparc
+    export ULTIPARC_TOOLCHAIN_PATH=<path to MIPS-I toolchain>/mipsisa32-elf
+
+To use Ultiparc system model for running simulations export the following
+environment variable and use the target location with Ultiparc sources and
+compiled system model:
+
+    # On Linux
+    export ULTIPARC_HOME=<path to Ultiparc source tree>/ultiparc
+
+
+
+Building and Running an Application
+-----------------------------------
+
+Follow these steps to build the Synchronization sample application provided
+with Zephyr.
+
+1. Navigate to the main project directory:
+
+    cd zephyr
+
+2. Set up your build environment:
+
+    # On Linux
+    source zephyr-env.sh
+
+3. Build the Synchronization example for the ultiparc_sim board, enter:
+
+    # On Linux
+    cd $ZEPHYR_BASE/samples/synchronization
+    mkdir -p build/ultiparc_sim && cd build/ultiparc_sim
+
+    # Use cmake to configure a Ninja-based build system:
+    cmake -GNinja -DBOARD=ultiparc_sim ../..
+
+    # Now run ninja on the generated build system:
+    ninja
+
+On Linux you can also build with make instead of ninja:
+
+    cd $ZEPHYR_BASE/samples/synchronization
+    mkdir -p build/ultiparc_sim && cd build/ultiparc_sim
+
+    # Use cmake to configure a Make-based build system:
+    cmake -DBOARD=ultiparc_sim ../..
+
+    # Now run make on the generated build system:
+    make
+
+4. Run Zephyr on a system model:
+
+    ninja run
+
+or in case of make:
+
+    make run
+
+5. Simulation will show output from running application:
+
+    ***** Booting Zephyr OS v1.12.0-653-gb8dd9a9 *****
+    threadA: Hello World from ultiparc!
+    threadB: Hello World from ultiparc!
+    threadA: Hello World from ultiparc!
+    threadB: Hello World from ultiparc!
+    threadA: Hello World from ultiparc!
+    threadB: Hello World from ultiparc!
+    threadA: Hello World from ultiparc!

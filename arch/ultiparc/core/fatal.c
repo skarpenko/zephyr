@@ -45,23 +45,23 @@ static const char *cause_str(u32_t vec)
 {
 	switch (vec) {
 	case 0:
-		return "reset";
+		return "Reset";
 	case 1:
-		return "bus error";
+		return "Bus Error";
 	case 2:
-		return "integer overflow";
+		return "Integer Overflow";
 	case 3:
-		return "address error";
+		return "Address Error";
 	case 4:
-		return "unimplemented instruction";
+		return "Unimplemented Instruction";
 	case 5:
-		return "breakpoint trap";
+		return "Breakpoint Trap";
 	case 6:
-		return "system call trap";
+		return "System Call Trap";
 	case 7:
-		return "hardware interrupt";
+		return "Hardware Interrupt";
 	default:
-		return "unknown";
+		return "Unknown";
 	}
 }
 #endif
@@ -117,17 +117,18 @@ FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 	printk("Current thread ID: %p\n"
 		"Exception: %s\n"
 		"Faulting instruction: 0x%08x\n"
-		"  at: 0x%08x  v0: 0x%08x  v1: 0x%08x  a0: 0x%08x\n"
-		"  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x  t0: 0x%08x\n"
-		"  t1: 0x%08x  t2: 0x%08x  t3: 0x%08x  t7: 0x%08x\n"
-		"  t5: 0x%08x  t6: 0x%08x  t7: 0x%08x  t8: 0x%08x\n"
-		"  t9: 0x%08x  ra: 0x%08x  lo: 0x%08x  hi: 0x%08x\n",
+		"   at: 0x%08x     v0: 0x%08x     v1: 0x%08x     a0: 0x%08x\n"
+		"   a1: 0x%08x     a2: 0x%08x     a3: 0x%08x     t0: 0x%08x\n"
+		"   t1: 0x%08x     t2: 0x%08x     t3: 0x%08x     t7: 0x%08x\n"
+		"   t5: 0x%08x     t6: 0x%08x     t7: 0x%08x     t8: 0x%08x\n"
+		"   t9: 0x%08x     ra: 0x%08x     hi: 0x%08x     lo: 0x%08x\n"
+		"  epc: 0x%08x  cause: 0x%08x     sr: 0x%08x    psr: 0x%08x\n",
 		k_current_get(), cause_str(esf->vec),
 		esf->epc + (esf->cause & CAUSE_BD_MASK ? 4 : 0),
 		esf->at, esf->v0, esf->v1, esf->a0, esf->a1, esf->a2,
 		esf->a3, esf->t0, esf->t1, esf->t2, esf->t3, esf->t4,
 		esf->t5, esf->t6, esf->t7, esf->t8, esf->t9, esf->ra,
-		esf->lo, esf->hi);
+		esf->hi, esf->lo, esf->epc, esf->cause, esf->sr, esf->psr);
 #endif
 
 	_SysFatalErrorHandler(reason, esf);
