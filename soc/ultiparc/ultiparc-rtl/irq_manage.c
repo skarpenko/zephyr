@@ -17,7 +17,8 @@
 #include <arch/ultiparc/irq_controller.h>
 #include <irq.h>
 #include <sw_isr_table.h>
-#include <logging/kernel_event_logger.h>
+#include <kswap.h>
+#include <tracing.h>
 
 
 /**
@@ -37,11 +38,13 @@ void _soc_enter_irq(void)
 
 	while((index = irq_controller_isr_vector_get()) != -1) {
 		struct _isr_table_entry *ite = &_sw_isr_table[index];
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_INTERRUPT
-		_sys_k_event_logger_interrupt();
-#endif
+
+		z_sys_trace_isr_enter();
+
 		ite->isr(ite->arg);
 		irq_controller_ack(index);
+
+		sys_trace_isr_exit();
 	}
 
 	_kernel.nested--;

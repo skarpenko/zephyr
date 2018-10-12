@@ -9,8 +9,8 @@
  * @brief Kernel event logger support for Ultiparc
  */
 
-#ifndef __KERNEL_EVENT_LOGGER_ARCH_H__
-#define __KERNEL_EVENT_LOGGER_ARCH_H__
+#ifndef ZEPHYR_ARCH_ULTIPARC_INCLUDE_TRACING_ARCH_H_
+#define ZEPHYR_ARCH_ULTIPARC_INCLUDE_TRACING_ARCH_H_
 
 #include <arch/ultiparc/irq_controller.h>
 
@@ -36,4 +36,4 @@ static inline int _sys_current_irq_key_get(void)
 #endif
 
 
-#endif /* __KERNEL_EVENT_LOGGER_ARCH_H__ */
+#endif /* ZEPHYR_ARCH_ULTIPARC_INCLUDE_TRACING_ARCH_H_ */

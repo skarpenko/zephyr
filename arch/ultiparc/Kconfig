@@ -4,11 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-choice
-	prompt "Ultiparc configuration selection"
-	depends on ULTIPARC
-	gsource "arch/ultiparc/soc/*/Kconfig.soc"
-endchoice
 
 menu "Ultiparc Options"
 	depends on ULTIPARC
@@ -31,6 +26,5 @@ config GEN_IRQ_VECTOR_TABLE
 
 endmenu
 
-gsource "arch/ultiparc/soc/*/Kconfig"
 
 endmenu

@@ -64,10 +64,16 @@ SECTIONS
 		*(.rodata)
 		*(".rodata.*")
 		*(.gnu.linkonce.r.*)
+
+#ifdef CONFIG_SOC_RODATA_LD
+#include <soc-rodata.ld>
+#endif
+
 #ifdef CONFIG_CUSTOM_RODATA_LD
 /* Located in project source directory */
 #include <custom-rodata.ld>
 #endif
+
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
 	_image_rom_end = .;
@@ -85,6 +91,10 @@ SECTIONS
 #endif
 		*(.data)
 		*(.data.*)
+
+#ifdef CONFIG_SOC_RWDATA_LD
+#include <soc-rwdata.ld>
+#endif
 
 #ifdef CONFIG_CUSTOM_RWDATA_LD
 /* Located in project source directory */
@@ -138,6 +148,11 @@ SECTIONS
 		 */
 		*(.noinit)
 		*(.noinit.*)
+
+#ifdef CONFIG_SOC_NOINIT_LD
+#include <soc-noinit.ld>
+#endif
+
 	} GROUP_LINK_IN(RAMABLE_REGION)
 
 	/* Define linker symbols */

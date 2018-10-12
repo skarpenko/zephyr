@@ -18,7 +18,7 @@ GTEXT(__swap)
 GTEXT(_thread_entry_wrapper)
 
 /* imports */
-GTEXT(_sys_k_event_logger_context_switch)
+GTEXT(z_sys_trace_thread_switched_in)
 GTEXT(_k_neg_eagain)
 
 
@@ -62,8 +62,8 @@ SECTION_FUNC(TEXT, __swap)
 	sw $a0, _thread_offset_to_irq_lock_state($t1)
 
 
-#if CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
-	jal _sys_k_event_logger_context_switch
+#if CONFIG_TRACING
+	jal z_sys_trace_thread_switched_in
 	nop
 	/* restore caller-saved $t0 */
 	la $t0, _kernel
