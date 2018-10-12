@@ -4,11 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_HTTP)
-#define SYS_LOG_DOMAIN "http"
-#define NET_SYS_LOG_LEVEL SYS_LOG_LEVEL_DEBUG
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_http
+#define NET_LOG_LEVEL CONFIG_HTTP_LOG_LEVEL
 
 #include <zephyr.h>
 #include <string.h>
@@ -233,7 +230,7 @@ int http_send_chunk(struct http_ctx *ctx, const char *buf, size_t len,
 		}
 	}
 
-	ret = http_prepare_and_send(ctx, HTTP_CRLF, sizeof(HTTP_CRLF), dst,
+	ret = http_prepare_and_send(ctx, HTTP_CRLF, sizeof(HTTP_CRLF) - 1, dst,
 				    user_send_data);
 	if (ret < 0) {
 		return ret;

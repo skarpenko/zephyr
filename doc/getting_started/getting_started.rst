@@ -155,7 +155,7 @@ cross-compilers, the Zephyr SDK also provides prebuilt host tools.
 It is, however, possible to build without the SDK.  If you are using 3rd party
 cross compilers, jump forward to `Using 3rd Party Cross Compilers`_ for
 details.  A "3rd party cross compiler" is a toolchain that the Zephyr build
-system already knows about, such as `GCC ARM Embedded`_ that we use in this
+system already knows about, such as `GNU ARM Embedded`_ that we use in this
 document.
 
 If you are going to use custom compilers, check `Using Custom Cross Compilers`_
@@ -191,21 +191,21 @@ Using 3rd Party Cross Compilers
 To use a 3rd party cross compiler that is not provided by the Zephyr
 SDK, follow the steps below.
 
-#. We will use the `GCC ARM Embedded`_ compiler for this example, download the
-   package suitable for your operating system from the `GCC ARM Embedded`_ website
+#. We will use the `GNU ARM Embedded`_ compiler for this example, download the
+   package suitable for your operating system from the `GNU ARM Embedded`_ website
    and extract it on your file system. This example assumes the compiler was
-   extracted to: :file:`<user folder>/gcc-arm-none-eabi-5_3-2016q1/`.
+   extracted to: :file:`<user folder>/gcc-arm-none-eabi-7-2018-q2-update/`.
 
 #. Build the example :ref:`hello_world` project, enter:
 
    .. code-block:: console
 
       # On Linux/macOS
-      export GCCARMEMB_TOOLCHAIN_PATH="~/gcc-arm-none-eabi-5_3-2016q1/"
-      export ZEPHYR_TOOLCHAIN_VARIANT=gccarmemb
+      export GNUARMEMB_TOOLCHAIN_PATH="~/gcc-arm-none-eabi-7-2018-q2-update/"
+      export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
       # On Windows
-      set GCCARMEMB_TOOLCHAIN_PATH="%userprofile%\gcc-arm-none-eabi-5_3-2016q1\"
-      set ZEPHYR_TOOLCHAIN_VARIANT=gccarmemb
+      set GNUARMEMB_TOOLCHAIN_PATH="%userprofile%\gcc-arm-none-eabi-7-2018-q2-update\"
+      set ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
 
    .. zephyr-app-commands::
       :zephyr-app: samples/hello_world
@@ -241,7 +241,7 @@ To use a custom cross compiler, follow the steps below.
    .. code-block:: console
 
       # On Linux
-      unset GCCARMEMB_TOOLCHAIN_PATH
+      unset GNUARMEMB_TOOLCHAIN_PATH
       export ZEPHYR_TOOLCHAIN_VARIANT=cross-compile
       export CROSS_COMPILE=/usr/bin/arm-none-eabi-
 
@@ -262,6 +262,26 @@ prefix of ``myarch-none-elf-``, it would be
 Make sure to unset the ZEPHYR_SDK_INSTALL_DIR if you don't use the SDK's host
 tools. See `Building without the Zephyr SDK`_ and `Set Up the Development
 Environment`_ for more details.
+
+Using Custom Cmake Toolchains
+=============================
+
+To use a custom toolchain defined in an external cmake file, export the
+following environment variables:
+
+   .. code-block:: console
+
+      export ZEPHYR_TOOLCHAIN_VARIANT=<toolchain name>
+      export TOOLCHAIN_ROOT=<path to toolchain>
+
+or set them as cmake variables:
+
+  .. code-block:: console
+
+      cmake -DZEPHYR_TOOLCHAIN_VARIANT=... -DTOOLCHAIN_ROOT=...
+
+Zephyr will then include the toolchain cmake file located in:
+``<path to toolchain>/cmake/toolchain/<toolchain name>.cmake``
 
 Running a Sample Application in QEMU
 ====================================
@@ -323,5 +343,5 @@ This executable can be instrumented like any other Linux process. For ex. with g
 or valgrind.
 Note that the native port is currently only tested in Linux.
 
-.. _GCC ARM Embedded: https://launchpad.net/gcc-arm-embedded
+.. _GNU ARM Embedded: https://developer.arm.com/open-source/gnu-toolchain/gnu-rm
 .. _CMake: https://cmake.org

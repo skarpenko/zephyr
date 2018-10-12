@@ -18,7 +18,7 @@
 #include "sys_clock.h"
 #include "timer_model.h"
 #include "soc.h"
-#include "posix_soc_if.h"
+#include "posix_trace.h"
 
 static u64_t tick_period; /* System tick period in number of hw cycles */
 static s64_t silent_ticks;
@@ -103,7 +103,7 @@ int _sys_clock_driver_init(struct device *device)
 {
 	ARG_UNUSED(device);
 
-	tick_period = sys_clock_us_per_tick;
+	tick_period = 1000000ul / sys_clock_ticks_per_sec;
 
 	hwtimer_enable(tick_period);
 
@@ -133,3 +133,19 @@ void k_busy_wait(u32_t usec_to_wait)
 	}
 }
 #endif
+
+#if defined(CONFIG_SYSTEM_CLOCK_DISABLE)
+/**
+ *
+ * @brief Stop announcing sys ticks into the kernel
+ *
+ * Disable the system ticks generation
+ *
+ * @return N/A
+ */
+void sys_clock_disable(void)
+{
+	irq_disable(TIMER_TICK_IRQ);
+	hwtimer_set_silent_ticks(INT64_MAX);
+}
+#endif /* CONFIG_SYSTEM_CLOCK_DISABLE */

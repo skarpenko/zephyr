@@ -4,11 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if 1
-#define SYS_LOG_DOMAIN "coap-client"
-#define SYS_LOG_LEVEL SYS_LOG_LEVEL_DEBUG
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_coap_client
+#define NET_LOG_LEVEL LOG_LEVEL_DBG
 
 #include <errno.h>
 #include <misc/printk.h>
@@ -51,7 +48,7 @@ static int dump_payload(const struct coap_packet *response)
 	}
 
 	while (frag) {
-		_hexdump(frag->data + offset, frag->len - offset, 0);
+		net_hexdump("", frag->data + offset, frag->len - offset);
 		frag = frag->frags;
 		offset = 0;
 	}
@@ -146,17 +143,17 @@ static int init_app(void)
 	struct sockaddr_in6 my_addr;
 	int r;
 
-	if (net_addr_pton(AF_INET6, CONFIG_NET_APP_MY_IPV6_ADDR,
+	if (net_addr_pton(AF_INET6, CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 			  &my_addr.sin6_addr)) {
 		NET_ERR("Invalid my IPv6 address: %s",
-			CONFIG_NET_APP_MY_IPV6_ADDR);
+			CONFIG_NET_CONFIG_MY_IPV6_ADDR);
 		return -1;
 	}
 
-	if (net_addr_pton(AF_INET6, CONFIG_NET_APP_PEER_IPV6_ADDR,
+	if (net_addr_pton(AF_INET6, CONFIG_NET_CONFIG_PEER_IPV6_ADDR,
 			  &peer_addr.sin6_addr)) {
 		NET_ERR("Invalid peer IPv6 address: %s",
-			CONFIG_NET_APP_PEER_IPV6_ADDR);
+			CONFIG_NET_CONFIG_PEER_IPV6_ADDR);
 		return -1;
 	}
 

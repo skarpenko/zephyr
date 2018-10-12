@@ -86,17 +86,17 @@ static struct wdt_timeout_cfg m_cfg_wdt1;
 /* m_state indicates state of particular test. Used to check whether testcase
  * should go to reset state or check other values after reset.
  */
-volatile uint32_t m_state __attribute__((section("app_noinit")));
+volatile uint32_t m_state __attribute__((section(".noinit.test_wdt")));
 
 /* m_testcase_index is incremented after each test to make test possible
  * switch to next testcase.
  */
-volatile uint32_t m_testcase_index __attribute__((section("app_noinit")));
+volatile uint32_t m_testcase_index __attribute__((section(".noinit.test_wdt")));
 
 /* m_testvalue contains value set in interrupt callback to point whether
  * first or second interrupt was fired.
  */
-volatile uint32_t m_testvalue __attribute__((section("app_noinit")));
+volatile uint32_t m_testvalue __attribute__((section(".noinit.test_wdt")));
 
 static void wdt_int_cb0(struct device *wdt_dev, int channel_id)
 {
@@ -150,6 +150,7 @@ static int test_wdt_no_callback(void)
 	m_testvalue = 0;
 	m_state = WDT_TEST_STATE_CHECK_RESET;
 	while (1) {
+		k_yield();
 	};
 }
 
@@ -196,6 +197,7 @@ static int test_wdt_callback_1(void)
 	m_testvalue = 0;
 	m_state = WDT_TEST_STATE_CHECK_RESET;
 	while (1) {
+		k_yield();
 	};
 }
 
@@ -256,9 +258,33 @@ static int test_wdt_callback_2(void)
 
 	while (1) {
 		wdt_feed(wdt, 0);
+		k_sleep(100);
 	};
 }
 #endif
+
+static int test_wdt_bad_window_max(void)
+{
+	int err;
+	struct device *wdt = device_get_binding(WDT_DEV_NAME);
+
+	if (!wdt) {
+		TC_PRINT("Cannot get WDT device\n");
+		return TC_FAIL;
+	}
+
+	TC_PRINT("Testcase: %s\n", __func__);
+
+	m_cfg_wdt0.callback = NULL;
+	m_cfg_wdt0.flags = WDT_FLAG_RESET_SOC;
+	m_cfg_wdt0.window.max = 0;
+	err = wdt_install_timeout(wdt, &m_cfg_wdt0);
+	if (err == -EINVAL) {
+		return TC_PASS;
+	}
+
+	return TC_FAIL;
+}
 
 void test_wdt(void)
 {
@@ -275,7 +301,11 @@ void test_wdt(void)
 		m_testcase_index++;
 #endif
 	}
-	if (m_testcase_index > 2) {
+	if (m_testcase_index == 3) {
+		zassert_true(test_wdt_bad_window_max() == TC_PASS, NULL);
+		m_testcase_index++;
+	}
+	if (m_testcase_index > 3) {
 		m_testcase_index = 0;
 		m_state = WDT_TEST_STATE_IDLE;
 	}

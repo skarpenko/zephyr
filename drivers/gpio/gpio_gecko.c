@@ -154,13 +154,21 @@ static int gpio_gecko_write(struct device *dev,
 			 * Writing zeros to the other bits leaves the data
 			 * output unchanged for the other pins.
 			 */
+#if defined(_GPIO_P_DOUTSET_MASK)
 			gpio_base->DOUTSET = BIT(pin);
+#else
+			BUS_RegBitWrite(&gpio_base->DOUT, pin, 1);
+#endif
 		} else {
 			/* Clear the data output for the corresponding pin.
 			 * Writing zeros to the other bits leaves the data
 			 * output unchanged for the other pins.
 			 */
+#if defined(_GPIO_P_DOUTCLR_MASK)
 			gpio_base->DOUTCLR = BIT(pin);
+#else
+			BUS_RegBitWrite(&gpio_base->DOUT, pin, 0);
+#endif
 		}
 	} else { /* GPIO_ACCESS_BY_PORT */
 		/* Write the data output for all the pins */
@@ -286,10 +294,10 @@ DEVICE_AND_API_INIT(gpio_gecko_common, CONFIG_GPIO_GECKO_COMMON_NAME,
 static int gpio_gecko_common_init(struct device *dev)
 {
 	gpio_gecko_common_data.count = 0;
-	IRQ_CONNECT(GPIO_EVEN_IRQn, CONFIG_GPIO_GECKO_COMMON_PRI,
+	IRQ_CONNECT(GPIO_EVEN_IRQn, CONFIG_GPIO_GECKO_COMMON_EVEN_PRI,
 		    gpio_gecko_common_isr, DEVICE_GET(gpio_gecko_common), 0);
 
-	IRQ_CONNECT(GPIO_ODD_IRQn, CONFIG_GPIO_GECKO_COMMON_PRI,
+	IRQ_CONNECT(GPIO_ODD_IRQn, CONFIG_GPIO_GECKO_COMMON_ODD_PRI,
 		    gpio_gecko_common_isr, DEVICE_GET(gpio_gecko_common), 0);
 
 	irq_enable(GPIO_EVEN_IRQn);

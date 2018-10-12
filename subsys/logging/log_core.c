@@ -11,29 +11,52 @@
 #include <logging/log_output.h>
 #include <misc/printk.h>
 #include <assert.h>
-#include <stdio.h>
+#include <atomic.h>
 
 #ifndef CONFIG_LOG_PRINTK_MAX_STRING_LENGTH
 #define CONFIG_LOG_PRINTK_MAX_STRING_LENGTH 1
 #endif
 
-#ifdef CONFIG_LOG_BACKEND_UART
-#include <logging/log_backend_uart.h>
-LOG_BACKEND_UART_DEFINE(log_backend_uart);
-#endif
+#define LOG_STRBUF_STR_SIZE \
+	(CONFIG_LOG_STRDUP_MAX_STRING + 1) /* additional byte for termination */
+
+#define LOG_STRBUF_BUF_SIZE \
+	ROUND_UP(LOG_STRBUF_STR_SIZE + 1, sizeof(u32_t))
+
+#define LOG_STRDUP_POOL_BUFFER_SIZE \
+	(LOG_STRBUF_BUF_SIZE * CONFIG_LOG_STRDUP_BUF_COUNT)
+
+static const char *log_strdup_fail_msg = "log_strdup pool empty!";
+struct k_mem_slab log_strdup_pool;
+static u8_t __noinit __aligned(sizeof(u32_t))
+		log_strdup_pool_buf[LOG_STRDUP_POOL_BUFFER_SIZE];
 
 static struct log_list_t list;
+static atomic_t initialized;
 static bool panic_mode;
-static bool initialized;
+static bool backend_attached;
+static atomic_t buffered_cnt;
+static k_tid_t proc_tid;
 
-static timestamp_get_t timestamp_func;
+static u32_t dummy_timestamp(void);
+static timestamp_get_t timestamp_func = dummy_timestamp;
+
+static u32_t dummy_timestamp(void)
+{
+	return 0;
+}
 
 static inline void msg_finalize(struct log_msg *msg,
 				struct log_msg_ids src_level)
 {
+	unsigned int key;
+
 	msg->hdr.ids = src_level;
 	msg->hdr.timestamp = timestamp_func();
-	unsigned int key = irq_lock();
+
+	atomic_inc(&buffered_cnt);
+
+	key = irq_lock();
 
 	log_list_add_tail(&list, msg);
 
@@ -41,6 +64,12 @@ static inline void msg_finalize(struct log_msg *msg,
 
 	if (IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) || panic_mode) {
 		(void)log_process(false);
+	} else if (!IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) &&
+		   CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD) {
+		if (buffered_cnt == CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD &&
+		    proc_tid) {
+			k_wakeup(proc_tid);
+		}
 	}
 }
 
@@ -109,11 +138,12 @@ void log_n(const char *str,
 	msg_finalize(msg, src_level);
 }
 
-void log_hexdump(const u8_t *data,
+void log_hexdump(const char *str,
+		 const u8_t *data,
 		 u32_t length,
 		 struct log_msg_ids src_level)
 {
-	struct log_msg *msg = log_msg_hexdump_create(data, length);
+	struct log_msg *msg = log_msg_hexdump_create(str, data, length);
 
 	if (msg == NULL) {
 		return;
@@ -130,17 +160,13 @@ int log_printk(const char *fmt, va_list ap)
 		struct log_msg *msg;
 		int length;
 
-		if (!initialized) {
-			log_init();
-		}
-
-		length = vsnprintf(formatted_str,
+		length = vsnprintk(formatted_str,
 				   sizeof(formatted_str), fmt, ap);
 
 		length = (length > sizeof(formatted_str)) ?
 			 sizeof(formatted_str) : length;
 
-		msg = log_msg_hexdump_create(formatted_str, length);
+		msg = log_msg_hexdump_create(NULL, formatted_str, length);
 		if (!msg) {
 			return 0;
 		}
@@ -173,34 +199,110 @@ static u32_t timestamp_get(void)
 	return k_cycle_get_32();
 }
 
-int log_init(void)
+void log_core_init(void)
+{
+	log_msg_pool_init();
+	log_list_init(&list);
+
+	/*
+	 * Initialize aggregated runtime filter levels (no backends are
+	 * attached yet, so leave backend slots in each dynamic filter set
+	 * alone for now).
+	 *
+	 * Each log source's aggregated runtime level is set to match its
+	 * compile-time level. When backends are attached later on in
+	 * log_init(), they'll be initialized to the same value.
+	 */
+	if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
+		for (int i = 0; i < log_sources_count(); i++) {
+			u32_t *filters = log_dynamic_filters_get(i);
+			u8_t level = log_compiled_level_get(i);
+
+			LOG_FILTER_SLOT_SET(filters,
+					    LOG_FILTER_AGGR_SLOT_IDX,
+					    level);
+		}
+	}
+}
+
+/*
+ * Initialize a backend's runtime filters to match the compile-time
+ * settings.
+ *
+ * (Aggregated filters were already set up in log_core_init().
+ */
+static void backend_filter_init(struct log_backend const *const backend)
+{
+	u8_t level;
+	int i;
+
+	if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
+		for (i = 0; i < log_sources_count(); i++) {
+			level = log_compiled_level_get(i);
+
+			log_filter_set(backend,
+				       CONFIG_LOG_DOMAIN_ID,
+				       i,
+				       level);
+		}
+	}
+}
+
+void log_init(void)
 {
 	assert(log_backend_count_get() < LOG_FILTERS_NUM_OF_SLOTS);
+	int i;
+
+	if (atomic_inc(&initialized)) {
+		return;
+	}
+
+	k_mem_slab_init(&log_strdup_pool, log_strdup_pool_buf,
+			LOG_STRBUF_BUF_SIZE,
+			CONFIG_LOG_STRDUP_BUF_COUNT);
 
 	/* Set default timestamp. */
 	timestamp_func = timestamp_get;
 	log_output_timestamp_freq_set(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC);
 
-	if (!initialized) {
-		log_list_init(&list);
+	/* Assign ids to backends. */
+	for (i = 0; i < log_backend_count_get(); i++) {
+		const struct log_backend *backend = log_backend_get(i);
 
-		/* Assign ids to backends. */
-		for (int i = 0; i < log_backend_count_get(); i++) {
-			log_backend_id_set(log_backend_get(i),
-					 i + LOG_FILTER_FIRST_BACKEND_SLOT_IDX);
+		log_backend_id_set(backend,
+				   i + LOG_FILTER_FIRST_BACKEND_SLOT_IDX);
+
+		if (backend->autostart) {
+			backend_filter_init(backend);
+			if (backend->api->init) {
+				backend->api->init();
+			}
+
+			log_backend_activate(backend, NULL);
+			backend_attached = true;
 		}
-
-		panic_mode = false;
-		initialized = true;
 	}
+}
 
-#ifdef CONFIG_LOG_BACKEND_UART
-	log_backend_uart_init();
-	log_backend_enable(&log_backend_uart,
-			   NULL,
-			   CONFIG_LOG_DEFAULT_LEVEL);
-#endif
-	return 0;
+static void thread_set(k_tid_t process_tid)
+{
+	proc_tid = process_tid;
+
+	if (!IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) &&
+	    CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD &&
+	    process_tid &&
+	    buffered_cnt >= CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD) {
+		k_wakeup(proc_tid);
+	}
+}
+
+void log_thread_set(k_tid_t process_tid)
+{
+	if (IS_ENABLED(CONFIG_LOG_PROCESS_THREAD)) {
+		assert(0);
+	} else {
+		thread_set(process_tid);
+	}
 }
 
 int log_set_timestamp_func(timestamp_get_t timestamp_getter, u32_t freq)
@@ -218,6 +320,10 @@ int log_set_timestamp_func(timestamp_get_t timestamp_getter, u32_t freq)
 void log_panic(void)
 {
 	struct log_backend const *backend;
+
+	if (panic_mode) {
+		return;
+	}
 
 	for (int i = 0; i < log_backend_count_get(); i++) {
 		backend = log_backend_get(i);
@@ -271,16 +377,25 @@ bool log_process(bool bypass)
 {
 	struct log_msg *msg;
 
+	if (!backend_attached) {
+		return false;
+	}
 	unsigned int key = irq_lock();
 
 	msg = log_list_head_get(&list);
 	irq_unlock(key);
 
 	if (msg != NULL) {
+		atomic_dec(&buffered_cnt);
 		msg_process(msg, bypass);
 	}
 
 	return (log_list_head_peek(&list) != NULL);
+}
+
+u32_t log_buffered_cnt(void)
+{
+	return buffered_cnt;
 }
 
 u32_t log_src_cnt_get(u32_t domain_id)
@@ -290,9 +405,7 @@ u32_t log_src_cnt_get(u32_t domain_id)
 
 const char *log_source_name_get(u32_t domain_id, u32_t src_id)
 {
-	assert(src_id < log_sources_count());
-
-	return log_name_get(src_id);
+	return src_id < log_sources_count() ? log_name_get(src_id) : NULL;
 }
 
 static u32_t max_filter_get(u32_t filters)
@@ -367,8 +480,9 @@ void log_backend_enable(struct log_backend const *const backend,
 			void *ctx,
 			u32_t level)
 {
-	log_backend_activate(backend, ctx);
 	backend_filter_set(backend, level);
+	log_backend_activate(backend, ctx);
+	backend_attached = true;
 }
 
 void log_backend_disable(struct log_backend const *const backend)
@@ -393,3 +507,79 @@ u32_t log_filter_get(struct log_backend const *const backend,
 		return log_compiled_level_get(src_id);
 	}
 }
+
+char *log_strdup(const char *str)
+{
+	u32_t *dupl;
+	char *sdupl;
+	int err;
+
+	err = k_mem_slab_alloc(&log_strdup_pool, (void **)&dupl, K_NO_WAIT);
+	if (err) {
+		/* failed to allocate */
+		return (char *)log_strdup_fail_msg;
+	}
+
+	/* Set 'allocated' flag. */
+	*dupl = 1;
+	dupl++;
+	sdupl = (char *)dupl;
+
+	strncpy(sdupl, str, CONFIG_LOG_STRDUP_MAX_STRING - 1);
+	sdupl[LOG_STRBUF_STR_SIZE - 1] = '\0';
+	sdupl[LOG_STRBUF_STR_SIZE - 2] = '~';
+
+	return sdupl;
+}
+
+bool log_is_strdup(void *buf)
+{
+	/* Lowest possible address is located at the second word of the first
+	 * buffer in the pool. First word is dedicated for 'allocated' flag.
+	 *
+	 * Highest possible address is the second word of the last buffer in the
+	 * pool.
+	 */
+	static const void *start = log_strdup_pool_buf + sizeof(u32_t);
+	static const void *end = &log_strdup_pool_buf[LOG_STRDUP_POOL_BUFFER_SIZE
+					       - LOG_STRBUF_BUF_SIZE
+					       + sizeof(u32_t)];
+	return (buf >= start) && (buf <= end);
+}
+
+void log_free(void *str)
+{
+	u32_t *buf = (u32_t *)str;
+
+	buf--;
+	if (atomic_dec((atomic_t *)buf) == 1) {
+		k_mem_slab_free(&log_strdup_pool, (void **)&buf);
+	}
+}
+
+#ifdef CONFIG_LOG_PROCESS_THREAD
+static void log_process_thread_func(void *dummy1, void *dummy2, void *dummy3)
+{
+	log_init();
+	thread_set(k_current_get());
+
+	while (1) {
+		if (log_process(false) == false) {
+			k_sleep(CONFIG_LOG_PROCESS_THREAD_SLEEP_MS);
+		}
+	}
+}
+
+K_THREAD_DEFINE(logging, CONFIG_LOG_PROCESS_THREAD_STACK_SIZE,
+		log_process_thread_func, NULL, NULL, NULL,
+		CONFIG_LOG_PROCESS_THREAD_PRIO, 0, K_NO_WAIT);
+#else
+#include <init.h>
+static int enable_logger(struct device *arg)
+{
+	ARG_UNUSED(arg);
+	log_init();
+	return 0;
+}
+SYS_INIT(enable_logger, POST_KERNEL, 0);
+#endif /* CONFIG_LOG_PROCESS_THREAD */

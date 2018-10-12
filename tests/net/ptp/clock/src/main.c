@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL CONFIG_NET_L2_ETHERNET_LOG_LEVEL
+
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -27,7 +30,7 @@
 #define NET_LOG_ENABLED 1
 #include "net_private.h"
 
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
@@ -252,7 +255,7 @@ struct user_data {
 	int total_if_count;
 };
 
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 static const char *iface2str(struct net_if *iface)
 {
 #ifdef CONFIG_NET_L2_ETHERNET
@@ -275,6 +278,11 @@ static void iface_cb(struct net_if *iface, void *user_data)
 	if (net_if_l2(iface) == &NET_L2_GET_NAME(ETHERNET)) {
 		static int ptp_iface_idx;
 		struct device *clk;
+
+		if (ud->eth_if_count >= ARRAY_SIZE(eth_interfaces)) {
+			DBG("Invalid interface %p\n", iface);
+			return;
+		}
 
 		clk = net_eth_get_ptp_clock(iface);
 		if (!clk) {
@@ -416,7 +424,7 @@ static void test_ptp_clock_iface(int idx)
 
 	ptp_clock_adjust(clk, rnd_value);
 
-	memset(&tm, 0, sizeof(tm));
+	(void)memset(&tm, 0, sizeof(tm));
 	ptp_clock_get(clk, &tm);
 
 	new_value = timestamp_to_nsec(&tm);

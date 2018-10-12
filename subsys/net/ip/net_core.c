@@ -11,10 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_CORE)
-#define SYS_LOG_DOMAIN "net/core"
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_core
+#define NET_LOG_LEVEL CONFIG_NET_CORE_LOG_LEVEL
 
 #include <init.h>
 #include <kernel.h>
@@ -30,6 +28,7 @@
 #include <net/dns_resolve.h>
 #include <net/tcp.h>
 #include <net/gptp.h>
+#include <net/lldp.h>
 
 #include "net_private.h"
 #include "net_shell.h"
@@ -49,6 +48,7 @@
 #include "connection.h"
 #include "udp_internal.h"
 #include "tcp_internal.h"
+#include "ipv4_autoconf_internal.h"
 
 #include "net_stats.h"
 
@@ -130,6 +130,9 @@ static void processing_data(struct net_pkt *pkt, bool is_loopback)
 /* Things to setup after we are able to RX and TX */
 static void net_post_init(void)
 {
+#if defined(CONFIG_NET_LLDP)
+	net_lldp_init();
+#endif
 #if defined(CONFIG_NET_GPTP)
 	net_gptp_init();
 #endif
@@ -288,13 +291,12 @@ int net_send_data(struct net_pkt *pkt)
 
 static void net_rx(struct net_if *iface, struct net_pkt *pkt)
 {
-#if defined(CONFIG_NET_STATISTICS) || defined(CONFIG_NET_DEBUG_CORE)
 	size_t pkt_len;
+
 #if defined(CONFIG_NET_STATISTICS)
 	pkt_len = pkt->total_pkt_len;
 #else
 	pkt_len = net_pkt_get_len(pkt);
-#endif
 #endif
 
 	NET_DBG("Received pkt %p len %zu", pkt, pkt_len);
@@ -373,10 +375,11 @@ static inline void l3_init(void)
 	net_icmpv6_init();
 	net_ipv6_init();
 
+	net_ipv4_autoconf_init();
+
 #if defined(CONFIG_NET_UDP) || defined(CONFIG_NET_TCP)
 	net_conn_init();
 #endif
-	net_udp_init();
 	net_tcp_init();
 
 	net_route_init();
@@ -405,7 +408,7 @@ static int net_init(struct device *unused)
 	init_rx_queues();
 
 #if CONFIG_NET_DHCPV4
-	status = dhcpv4_init();
+	status = net_dhcpv4_init();
 	if (status) {
 		return status;
 	}

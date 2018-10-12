@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL CONFIG_NET_UTILS_LOG_LEVEL
+
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
@@ -290,8 +293,12 @@ void test_utils(void)
 	int i, chunk, datalen, total = 0;
 
 	/* Packet fits to one fragment */
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	memcpy(net_buf_add(frag, sizeof(pkt1)), pkt1, sizeof(pkt1));
@@ -320,8 +327,12 @@ void test_utils(void)
 	net_pkt_unref(pkt);
 
 	/* Then a case where there will be two fragments */
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 	memcpy(net_buf_add(frag, sizeof(pkt2) / 2), pkt2, sizeof(pkt2) / 2);
 
@@ -334,7 +345,9 @@ void test_utils(void)
 	frag->data[hdr_len + 2] = 0;
 	frag->data[hdr_len + 3] = 0;
 
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 	memcpy(net_buf_add(frag, sizeof(pkt2) - sizeof(pkt2) / 2),
 	       pkt2 + sizeof(pkt2) / 2, sizeof(pkt2) - sizeof(pkt2) / 2);
@@ -348,8 +361,12 @@ void test_utils(void)
 	net_pkt_unref(pkt);
 
 	/* Then a case where there will be two fragments but odd data size */
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 	memcpy(net_buf_add(frag, sizeof(pkt3) / 2), pkt3, sizeof(pkt3) / 2);
 	printk("First fragment will have %zd bytes\n", sizeof(pkt3) / 2);
@@ -363,7 +380,9 @@ void test_utils(void)
 	frag->data[hdr_len + 2] = 0;
 	frag->data[hdr_len + 3] = 0;
 
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 	memcpy(net_buf_add(frag, sizeof(pkt3) - sizeof(pkt3) / 2),
 	       pkt3 + sizeof(pkt3) / 2, sizeof(pkt3) - sizeof(pkt3) / 2);
@@ -379,8 +398,12 @@ void test_utils(void)
 	net_pkt_unref(pkt);
 
 	/* Then a case where there will be several fragments */
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
-	frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
+	frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 	memcpy(net_buf_add(frag, sizeof(struct net_ipv6_hdr)), pkt3,
 	       sizeof(struct net_ipv6_hdr));
@@ -395,7 +418,9 @@ void test_utils(void)
 
 	for (i = 0; i < datalen/chunk; i++) {
 		/* Next fragments will contain the data in odd sizes */
-		frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+		frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+		zassert_not_null(frag, "Out of mem");
+
 		net_pkt_frag_add(pkt, frag);
 		memcpy(net_buf_add(frag, chunk),
 		       pkt3 + sizeof(struct net_ipv6_hdr) + i * chunk, chunk);
@@ -414,7 +439,9 @@ void test_utils(void)
 		}
 	}
 	if ((datalen - total) > 0) {
-		frag = net_pkt_get_reserve_rx_data(10, K_FOREVER);
+		frag = net_pkt_get_reserve_rx_data(10, K_SECONDS(1));
+		zassert_not_null(frag, "Out of mem");
+
 		net_pkt_frag_add(pkt, frag);
 		memcpy(net_buf_add(frag, datalen - total),
 		       pkt3 + sizeof(struct net_ipv6_hdr) + i * chunk,
@@ -447,9 +474,13 @@ void test_utils(void)
 	 * This one has ethernet header before IPv4 data.
 	 */
 #if defined(CONFIG_NET_IPV4)
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
 	frag = net_pkt_get_reserve_rx_data(sizeof(struct net_eth_hdr),
-					    K_FOREVER);
+					   K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	net_pkt_set_ll_reserve(pkt, sizeof(struct net_eth_hdr));
@@ -476,9 +507,13 @@ void test_utils(void)
 	/* Another packet that fits to one fragment and which has correct
 	 * checksum. This one has ethernet header before IPv4 data.
 	 */
-	pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
+	pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+	zassert_not_null(pkt, "Out of mem");
+
 	frag = net_pkt_get_reserve_rx_data(sizeof(struct net_eth_hdr),
-					    K_FOREVER);
+					   K_SECONDS(1));
+	zassert_not_null(frag, "Out of mem");
+
 	net_pkt_frag_add(pkt, frag);
 
 	net_pkt_set_ll_reserve(pkt, sizeof(struct net_eth_hdr));
@@ -1248,7 +1283,7 @@ void test_addr_parse(void)
 
 #if defined(CONFIG_NET_IPV4)
 	for (i = 0; i < ARRAY_SIZE(parse_ipv4_entries) - 1; i++) {
-		memset(&addr, 0, sizeof(addr));
+		(void)memset(&addr, 0, sizeof(addr));
 
 		ret = net_ipaddr_parse(
 			parse_ipv4_entries[i].address,
@@ -1277,7 +1312,7 @@ void test_addr_parse(void)
 #endif
 #if defined(CONFIG_NET_IPV6)
 	for (i = 0; i < ARRAY_SIZE(parse_ipv6_entries) - 1; i++) {
-		memset(&addr, 0, sizeof(addr));
+		(void)memset(&addr, 0, sizeof(addr));
 
 		ret = net_ipaddr_parse(
 			parse_ipv6_entries[i].address,
@@ -1451,9 +1486,13 @@ void test_net_pkt_addr_parse(void)
 		struct sockaddr_in6 addr;
 		struct ipv6_test_data *data = &ipv6_test_data_set[i];
 
-		pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
+		pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+		zassert_not_null(pkt, "Out of mem");
+
 		frag = net_pkt_get_reserve_rx_data(sizeof(struct net_eth_hdr),
-						   K_FOREVER);
+						   K_SECONDS(1));
+		zassert_not_null(frag, "Out of mem");
+
 		net_pkt_frag_add(pkt, frag);
 
 		/* Copy ll header */
@@ -1503,9 +1542,13 @@ void test_net_pkt_addr_parse(void)
 		struct sockaddr_in addr;
 		struct ipv4_test_data *data = &ipv4_test_data_set[i];
 
-		pkt = net_pkt_get_reserve_rx(0, K_FOREVER);
+		pkt = net_pkt_get_reserve_rx(0, K_SECONDS(1));
+		zassert_not_null(pkt, "Out of mem");
+
 		frag = net_pkt_get_reserve_rx_data(sizeof(struct net_eth_hdr),
-						   K_FOREVER);
+						   K_SECONDS(1));
+		zassert_not_null(frag, "Out of mem");
+
 		net_pkt_frag_add(pkt, frag);
 
 		/* Copy ll header */

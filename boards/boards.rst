@@ -21,3 +21,4 @@ under :file:`doc/templates/board.tmpl`
    posix/index.rst
    riscv32/index.rst
    ultiparc/index.rst
+   shields/index.rst

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL LOG_LEVEL_WRN
+
 #include <net/mqtt.h>
 #include <ztest.h>
 
@@ -218,7 +221,7 @@ static int init_network(void)
 	int rc;
 
 	/* Set everything to 0 and later just assign the required fields. */
-	memset(&client_ctx, 0x00, sizeof(client_ctx));
+	(void)memset(&client_ctx, 0x00, sizeof(client_ctx));
 
 	/* connect, disconnect and malformed may be set to NULL */
 	client_ctx.mqtt_ctx.connect = connect_cb;
@@ -254,7 +257,7 @@ static int init_network(void)
 	}
 
 	rc = mqtt_connect(&client_ctx.mqtt_ctx);
-	if (!rc) {
+	if (rc != 0) {
 		goto exit_app;
 	}
 

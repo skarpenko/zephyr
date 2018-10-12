@@ -7,12 +7,15 @@
 #
 
 menuconfig DISPLAY
-	bool
-	prompt "Display Drivers"
+	bool "Display Drivers"
 	help
 	  Enable display drivers
 
 if DISPLAY
+
+module = DISPLAY
+module-str = display
+source "subsys/logging/Kconfig.template.log_config"
 
 source "drivers/display/Kconfig.microbit"
 

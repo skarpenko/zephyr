@@ -53,8 +53,8 @@
 #define NORMAL_OUTER_INNER_WRITE_BACK_WRITE_READ_ALLOCATE_SHAREABLE \
 	((1 << MPU_RASR_TEX_Pos) |\
 	 MPU_RASR_C_Msk | MPU_RASR_B_Msk | MPU_RASR_S_Msk)
-#define NORMAL_OUTER_INNER_WRITE_BACK_WRITE_READ_ALLOCATE_NONSHAREABLE \
-	((1 << MPU_RASR_TEX_Pos) | MPU_RASR_C_Msk | MPU_RASR_S_Msk)
+#define NORMAL_OUTER_INNER_WRITE_BACK_WRITE_READ_ALLOCATE_NON_SHAREABLE \
+	((1 << MPU_RASR_TEX_Pos) | MPU_RASR_C_Msk | MPU_RASR_B_Msk)
 #define DEVICE_NON_SHAREABLE            (2 << MPU_RASR_TEX_Pos)
 
 /* Bit-masks to disable sub-regions. */
@@ -101,38 +101,65 @@
 #define REGION_4G       REGION_SIZE(4GB)
 
 /* Some helper defines for common regions */
-#define REGION_USER_RAM_ATTR(size) \
-	(NORMAL_OUTER_INNER_NON_CACHEABLE_NON_SHAREABLE | \
-	MPU_RASR_XN_Msk | size | FULL_ACCESS_Msk)
 #define REGION_RAM_ATTR(size) \
-	(NORMAL_OUTER_INNER_NON_CACHEABLE_NON_SHAREABLE | \
-	 MPU_RASR_XN_Msk | size | P_RW_U_NA_Msk)
+{ \
+	(NORMAL_OUTER_INNER_WRITE_BACK_WRITE_READ_ALLOCATE_NON_SHAREABLE | \
+	 MPU_RASR_XN_Msk | size | P_RW_U_NA_Msk) \
+}
 #if defined(CONFIG_MPU_ALLOW_FLASH_WRITE)
 #define REGION_FLASH_ATTR(size) \
-	(NORMAL_OUTER_INNER_NON_CACHEABLE_NON_SHAREABLE | size | \
-		P_RW_U_RO_Msk)
+{ \
+	(NORMAL_OUTER_INNER_WRITE_THROUGH_NON_SHAREABLE | size | \
+		P_RW_U_RO_Msk) \
+}
 #else
 #define REGION_FLASH_ATTR(size) \
-	(NORMAL_OUTER_INNER_NON_CACHEABLE_NON_SHAREABLE | size | RO_Msk)
+{ \
+	(NORMAL_OUTER_INNER_WRITE_THROUGH_NON_SHAREABLE | size | RO_Msk) \
+}
 #endif
-#define REGION_PPB_ATTR(size) (STRONGLY_ORDERED_SHAREABLE | size | \
-		P_RW_U_NA_Msk)
-#define REGION_IO_ATTR(size) (DEVICE_NON_SHAREABLE | size | P_RW_U_NA_Msk)
+#define REGION_PPB_ATTR(size) { (STRONGLY_ORDERED_SHAREABLE | size | \
+		P_RW_U_NA_Msk) }
+#define REGION_IO_ATTR(size) { (DEVICE_NON_SHAREABLE | size | P_RW_U_NA_Msk) }
 
-
-/* Region definition data structure */
-struct arm_mpu_region {
-	/* Region Base Address */
-	u32_t base;
-	/* Region Name */
-	const char *name;
-	/* Region Attributes */
-	u32_t attr;
+struct arm_mpu_region_attr {
+	/* Attributes belonging to RASR (including the encoded region size) */
+	u32_t rasr;
 };
 
-#define MPU_REGION_ENTRY(_name, _base, _attr) \
-	{\
-		.name = _name, \
-		.base = _base, \
-		.attr = _attr, \
-	}
+typedef struct arm_mpu_region_attr arm_mpu_region_attr_t;
+
+#ifdef CONFIG_USERSPACE
+#ifndef _ASMLANGUAGE
+/* Read-Write access permission attributes */
+#define K_MEM_PARTITION_P_NA_U_NA	(NO_ACCESS_Msk | NOT_EXEC)
+#define K_MEM_PARTITION_P_RW_U_RW	(P_RW_U_RW_Msk | NOT_EXEC)
+#define K_MEM_PARTITION_P_RW_U_RO	(P_RW_U_RO_Msk | NOT_EXEC)
+#define K_MEM_PARTITION_P_RW_U_NA	(P_RW_U_NA_Msk | NOT_EXEC)
+#define K_MEM_PARTITION_P_RO_U_RO	(P_RO_U_RO_Msk | NOT_EXEC)
+#define K_MEM_PARTITION_P_RO_U_NA	(P_RO_U_NA_Msk | NOT_EXEC)
+
+/* Execution-allowed attributes */
+#define K_MEM_PARTITION_P_RWX_U_RWX	(P_RW_U_RW_Msk)
+#define K_MEM_PARTITION_P_RWX_U_RX	(P_RW_U_RO_Msk)
+#define K_MEM_PARTITION_P_RX_U_RX	(P_RO_U_RO_Msk)
+
+#define K_MEM_PARTITION_IS_WRITABLE(attr) \
+	({ \
+		int __is_writable__; \
+		switch (attr) { \
+		case P_RW_U_RW: \
+		case P_RW_U_RO: \
+		case P_RW_U_NA: \
+			__is_writable__ = 1; \
+			break; \
+		default: \
+			__is_writable__ = 0; \
+		} \
+		__is_writable__; \
+	})
+
+#define K_MEM_PARTITION_IS_EXECUTABLE(attr) \
+	(!((attr) & (NOT_EXEC)))
+#endif /* _ASMLANGUAGE */
+#endif /* USERSPACE */

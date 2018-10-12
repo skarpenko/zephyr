@@ -8,7 +8,7 @@
  * @file
  * @brief Linker command/script file
  *
- * Linker script for the Cortex-M3 platform.
+ * Linker script for the Cortex-M platforms.
  */
 
 #define _LINKER
@@ -87,6 +87,23 @@ ENTRY(CONFIG_KERNEL_ENTRY)
 
 SECTIONS
     {
+
+#include <linker/rel-sections.ld>
+
+    /*
+     * .plt and .iplt are here according to 'arm-zephyr-elf-ld --verbose',
+     * before text section.
+     */
+    SECTION_PROLOGUE(.plt,,)
+	{
+	*(.plt)
+	}
+
+    SECTION_PROLOGUE(.iplt,,)
+	{
+	*(.iplt)
+	}
+
     GROUP_START(ROMABLE_REGION)
 
 	_image_rom_start = ROM_ADDR;
@@ -114,6 +131,8 @@ SECTIONS
 
 	KEEP(*(IRQ_VECTOR_TABLE))
 
+	KEEP(*(.vectors))
+
 	KEEP(*(.openocd_dbg))
 	KEEP(*(".openocd_dbg.*"))
 
@@ -130,6 +149,12 @@ SECTIONS
 	*(.text)
 	*(".text.*")
 	*(.gnu.linkonce.t.*)
+
+	/*
+	 * These are here according to 'arm-zephyr-elf-ld --verbose',
+	 * after .gnu.linkonce.t.*
+	 */
+	*(.glue_7t) *(.glue_7) *(.vfp11_veneer) *(.v4_bx)
 
 #include <linker/priv_stacks-text.ld>
 #include <linker/kobject-text.ld>
@@ -163,6 +188,10 @@ SECTIONS
 	*(".rodata.*")
 	*(.gnu.linkonce.r.*)
 
+#ifdef CONFIG_SOC_RODATA_LD
+#include <soc-rodata.ld>
+#endif
+
 #ifdef CONFIG_CUSTOM_RODATA_LD
 /* Located in project source directory */
 #include <custom-rodata.ld>
@@ -184,6 +213,22 @@ SECTIONS
 	. = ALIGN(4);
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
+#if defined CONFIG_ARM_FIRMWARE_HAS_SECURE_ENTRY_FUNCS
+#if CONFIG_ARM_NSC_REGION_BASE_ADDRESS != 0
+       SECTION_PROLOGUE(.gnu.sgstubs,CONFIG_ARM_NSC_REGION_BASE_ADDRESS,)
+#else
+       SECTION_PROLOGUE(.gnu.sgstubs,,)
+#endif /* CONFIG_ARM_NSC_REGION_BASE_ADDRESS != 0 */
+       {
+       . = ALIGN(4);
+       __sg_start = .;
+       *(.gnu*)
+       . = ALIGN(4);
+       __sg_end = .;
+       __sg_size = __sg_end - __sg_start;
+       } GROUP_LINK_IN(ROMABLE_REGION)
+#endif /* CONFIG_ARM_FIRMWARE_HAS_SECURE_ENTRY_FUNCS */
+
 	_image_rodata_end = .;
 	_image_rom_end = .;
 
@@ -196,6 +241,18 @@ SECTIONS
     KEEP(*(TI_CCFG))
     } > FLASH_CCFG
 #endif
+
+    /*
+     * These are here according to 'arm-zephyr-elf-ld --verbose',
+     * before data section.
+     */
+    SECTION_PROLOGUE(.got,,)
+	{
+	*(.got.plt)
+	*(.igot.plt)
+	*(.got)
+	*(.igot)
+	}
 
     GROUP_START(RAMABLE_REGION)
 
@@ -219,15 +276,34 @@ SECTIONS
 	}
 #endif
 
+#include <app_data_alignment.ld>
+
+#if defined(CONFIG_APP_SHARED_MEM)
+#if defined(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT)
+#define APP_SHARED_ALIGN . = ALIGN(4);
+		#include <app_smem.ld>
+#else
+	SECTION_PROLOGUE(_APP_SMEM_SECTION_NAME, (OPTIONAL),)
+	{
+		. = ALIGN(4);
+		_image_ram_start = .;
+		_app_smem_start = .;
+		APP_SMEM_SECTION()
+		_app_smem_end = .;
+		. = ALIGN(4);
+	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+#endif  /* CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT */
+
+	_app_smem_size = _app_smem_end - _app_smem_start;
+	_app_smem_rom_start = LOADADDR(_APP_SMEM_SECTION_NAME);
+#endif  /* CONFIG_APP_SHARED_MEM */
+
 #ifdef CONFIG_APPLICATION_MEMORY
 	SECTION_DATA_PROLOGUE(_APP_DATA_SECTION_NAME, (OPTIONAL),)
 	{
 
-#include <app_data_alignment.ld>
-
 		__app_ram_start = .;
 		__app_data_ram_start = .;
-		_image_ram_start = .;
 		APP_INPUT_SECTION(.data)
 		APP_INPUT_SECTION(".data.*")
 		__app_data_ram_end = .;
@@ -271,9 +347,6 @@ SECTIONS
          */
         . = ALIGN(4);
 	__bss_start = .;
-#ifndef CONFIG_APPLICATION_MEMORY
-	_image_ram_start = .;
-#endif
 	__kernel_ram_start = .;
 
 	KERNEL_INPUT_SECTION(.bss)
@@ -298,6 +371,12 @@ SECTIONS
         KERNEL_INPUT_SECTION(".noinit.*")
 	*(".kernel_noinit.*")
 
+#include <linker/priv_stacks-noinit.ld>
+
+#ifdef CONFIG_SOC_NOINIT_LD
+#include <soc-noinit.ld>
+#endif
+
         } GROUP_LINK_IN(RAMABLE_REGION)
 
     SECTION_DATA_PROLOGUE(_DATA_SECTION_NAME,,)
@@ -306,6 +385,10 @@ SECTIONS
 	KERNEL_INPUT_SECTION(.data)
 	KERNEL_INPUT_SECTION(".data.*")
 	*(".kernel.*")
+
+#ifdef CONFIG_SOC_RWDATA_LD
+#include <soc-rwdata.ld>
+#endif
 
 #ifdef CONFIG_CUSTOM_RWDATA_LD
 /* Located in project source directory */
@@ -380,5 +463,13 @@ SECTIONS
 #ifdef CONFIG_GEN_ISR_TABLES
 #include <linker/intlist.ld>
 #endif
+
+#include <linker/debug-sections.ld>
+
+    SECTION_PROLOGUE(.ARM.attributes, 0,)
+	{
+	KEEP(*(.ARM.attributes))
+	KEEP(*(.gnu.attributes))
+	}
 
     }

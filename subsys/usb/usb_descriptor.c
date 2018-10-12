@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
 #include <misc/byteorder.h>
 #include <misc/__assert.h>
 #include <usb/usbstruct.h>
@@ -14,8 +15,9 @@
 #include <usb/usb_common.h>
 #include "usb_descriptor.h"
 
-#define SYS_LOG_LEVEL CONFIG_SYS_LOG_USB_DEVICE_LEVEL
-#include <logging/sys_log.h>
+#define LOG_LEVEL CONFIG_USB_DEVICE_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(usb_descriptor);
 
 /*
  * The last index of the initializer_string without null character is:
@@ -44,6 +46,10 @@ struct common_descriptor {
 	struct usb_cfg_descriptor cfg_descr;
 } __packed;
 
+#define USB_DESC_MANUFACTURER_IDX			1
+#define USB_DESC_PRODUCT_IDX				2
+#define USB_DESC_SERIAL_NUMBER_IDX			3
+
 /*
  * Device and configuration descriptor placed in the device section,
  * no additional descriptor may be placed there.
@@ -67,9 +73,9 @@ USBD_DEVICE_DESCR_DEFINE(primary) struct common_descriptor common_desc = {
 		.idVendor = sys_cpu_to_le16((u16_t)CONFIG_USB_DEVICE_VID),
 		.idProduct = sys_cpu_to_le16((u16_t)CONFIG_USB_DEVICE_PID),
 		.bcdDevice = sys_cpu_to_le16(BCDDEVICE_RELNUM),
-		.iManufacturer = 1,
-		.iProduct = 2,
-		.iSerialNumber = 3,
+		.iManufacturer = USB_DESC_MANUFACTURER_IDX,
+		.iProduct = USB_DESC_PRODUCT_IDX,
+		.iSerialNumber = USB_DESC_SERIAL_NUMBER_IDX,
 		.bNumConfigurations = 1,
 	},
 	/* Configuration descriptor */
@@ -158,14 +164,14 @@ static void ascii7_to_utf16le(void *descriptor)
 	int ascii_idx_max = USB_BSTRING_ASCII_IDX_MAX(str_descr->bLength);
 	u8_t *buf = (u8_t *)&str_descr->bString;
 
-	SYS_LOG_DBG("idx_max %d, ascii_idx_max %d, buf %x",
-		    idx_max, ascii_idx_max, (u32_t)buf);
+	USB_DBG("idx_max %d, ascii_idx_max %d, buf %x",
+		idx_max, ascii_idx_max, (u32_t)buf);
 
 	for (int i = idx_max; i >= 0; i -= 2) {
-		SYS_LOG_DBG("char %c : %x, idx %d -> %d",
-			    buf[ascii_idx_max],
-			    buf[ascii_idx_max],
-			    ascii_idx_max, i);
+		USB_DBG("char %c : %x, idx %d -> %d",
+			buf[ascii_idx_max],
+			buf[ascii_idx_max],
+			ascii_idx_max, i);
 		__ASSERT(buf[ascii_idx_max] > 0x1F && buf[ascii_idx_max] < 0x7F,
 			 "Only printable ascii-7 characters are allowed in USB "
 			 "string descriptors");
@@ -254,8 +260,7 @@ static int usb_validate_ep_cfg_data(struct usb_ep_descriptor * const ep_descr,
 				} else {
 					*requested_ep |= (1 << idx);
 				}
-				SYS_LOG_DBG("endpoint 0x%x",
-					    ep_data[i].ep_addr);
+				USB_DBG("endpoint 0x%x", ep_data[i].ep_addr);
 				return 0;
 			}
 		}
@@ -282,6 +287,41 @@ static struct usb_cfg_data *usb_get_cfg_data(struct usb_if_descriptor *iface)
 }
 
 /*
+ * Default USB SN string descriptor is CONFIG_USB_DEVICE_SN, but sometimes
+ * we want use another string as SN descriptor such as the chip's unique
+ * ID. So user can implement this function return a string thats will be
+ * replaced the default SN.
+ * Please note that the new SN descriptor you changed must has same length
+ * as CONFIG_USB_DEVICE_SN.
+ */
+__weak u8_t *usb_update_sn_string_descriptor(void)
+{
+	return NULL;
+}
+
+static void
+usb_fix_ascii_sn_string_descriptor(struct usb_sn_descriptor *sn)
+{
+	u8_t *runtime_sn =  usb_update_sn_string_descriptor();
+	int runtime_sn_len, default_sn_len;
+
+	if (!runtime_sn) {
+		return;
+	}
+
+	runtime_sn_len = strlen(runtime_sn);
+	default_sn_len = strlen(CONFIG_USB_DEVICE_SN);
+
+	if (runtime_sn_len != default_sn_len) {
+		USB_ERR("the new SN descriptor doesn't has the same "
+			"length as CONFIG_USB_DEVICE_SN");
+		return;
+	}
+
+	memcpy(sn->bString, runtime_sn, runtime_sn_len);
+}
+
+/*
  * The entire descriptor, placed in the .usb.descriptor section,
  * needs to be fixed before use. Currently, only the length of the
  * entire device configuration (with all interfaces and endpoints)
@@ -305,24 +345,24 @@ static int usb_fix_descriptor(struct usb_desc_header *head)
 		switch (head->bDescriptorType) {
 		case USB_CONFIGURATION_DESC:
 			cfg_descr = (struct usb_cfg_descriptor *)head;
-			SYS_LOG_DBG("Configuration descriptor %p", head);
+			USB_DBG("Configuration descriptor %p", head);
 			break;
 		case USB_ASSOCIATION_DESC:
-			SYS_LOG_DBG("Association descriptor %p", head);
+			USB_DBG("Association descriptor %p", head);
 			break;
 		case USB_INTERFACE_DESC:
 			if_descr = (struct usb_if_descriptor *)head;
-			SYS_LOG_DBG("Interface descriptor %p", head);
+			USB_DBG("Interface descriptor %p", head);
 			if (if_descr->bAlternateSetting) {
-				SYS_LOG_DBG("Skip alternate interface");
+				USB_DBG("Skip alternate interface");
 				break;
 			}
 
 			if (if_descr->bInterfaceNumber == 0) {
 				cfg_data = usb_get_cfg_data(if_descr);
 				if (!cfg_data) {
-					SYS_LOG_ERR("There is no usb_cfg_data "
-						    "for %p", head);
+					USB_ERR("There is no usb_cfg_data "
+						"for %p", head);
 					return -1;
 				}
 
@@ -335,18 +375,26 @@ static int usb_fix_descriptor(struct usb_desc_header *head)
 			numof_ifaces++;
 			break;
 		case USB_ENDPOINT_DESC:
-			SYS_LOG_DBG("Endpoint descriptor %p", head);
+			USB_DBG("Endpoint descriptor %p", head);
 			ep_descr = (struct usb_ep_descriptor *)head;
 			if (usb_validate_ep_cfg_data(ep_descr,
 						     cfg_data,
 						     &requested_ep)) {
-				SYS_LOG_ERR("Failed to validate endpoints");
+				USB_ERR("Failed to validate endpoints");
 				return -1;
 			}
 
 			break;
 		case 0:
 		case USB_STRING_DESC:
+			/*
+			 * Copy runtime SN string descriptor first, if has
+			 */
+			if (str_descr_idx == USB_DESC_SERIAL_NUMBER_IDX) {
+				struct usb_sn_descriptor *sn =
+					(struct usb_sn_descriptor *)head;
+				usb_fix_ascii_sn_string_descriptor(sn);
+			}
 			/*
 			 * Skip language descriptor but correct
 			 * wTotalLength and bNumInterfaces once.
@@ -355,13 +403,12 @@ static int usb_fix_descriptor(struct usb_desc_header *head)
 				ascii7_to_utf16le(head);
 			} else {
 				if (!cfg_descr) {
-					SYS_LOG_ERR("Incomplete device "
-						    "descriptor");
+					USB_ERR("Incomplete device descriptor");
 					return -1;
 				}
 
-				SYS_LOG_DBG("Now the wTotalLength is %d",
-					    (u8_t *)head - (u8_t *)cfg_descr);
+				USB_DBG("Now the wTotalLength is %d",
+					(u8_t *)head - (u8_t *)cfg_descr);
 				cfg_descr->wTotalLength =
 					sys_cpu_to_le16((u8_t *)head -
 							(u8_t *)cfg_descr);
@@ -380,7 +427,7 @@ static int usb_fix_descriptor(struct usb_desc_header *head)
 	}
 
 	if ((head + 1) != __usb_descriptor_end) {
-		SYS_LOG_DBG("try to fix next descriptor at %p", head + 1);
+		USB_DBG("try to fix next descriptor at %p", head + 1);
 		return usb_fix_descriptor(head + 1);
 	}
 
@@ -390,11 +437,11 @@ static int usb_fix_descriptor(struct usb_desc_header *head)
 
 u8_t *usb_get_device_descriptor(void)
 {
-	SYS_LOG_DBG("__usb_descriptor_start %p", __usb_descriptor_start);
-	SYS_LOG_DBG("__usb_descriptor_end %p", __usb_descriptor_end);
+	USB_DBG("__usb_descriptor_start %p", __usb_descriptor_start);
+	USB_DBG("__usb_descriptor_end %p", __usb_descriptor_end);
 
 	if (usb_fix_descriptor(__usb_descriptor_start)) {
-		SYS_LOG_ERR("Failed to fixup USB descriptor");
+		USB_ERR("Failed to fixup USB descriptor");
 		return NULL;
 	}
 

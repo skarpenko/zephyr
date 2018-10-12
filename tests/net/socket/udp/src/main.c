@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL CONFIG_NET_SOCKETS_LOG_LEVEL
+
 #include <stdio.h>
 #include <ztest_assert.h>
 
@@ -52,7 +55,7 @@ static void prepare_sock_v6(const char *addr,
 	*sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	zassert_true(*sock >= 0, "socket open failed");
 
-	memset(sockaddr, 0, sizeof(*sockaddr));
+	(void)memset(sockaddr, 0, sizeof(*sockaddr));
 	sockaddr->sin6_family = AF_INET6;
 	sockaddr->sin6_port = htons(port);
 	rv = inet_pton(AF_INET6, addr, &sockaddr->sin6_addr);
@@ -128,12 +131,12 @@ void test_v4_sendto_recvfrom(void)
 	struct sockaddr_in client_addr;
 	struct sockaddr_in server_addr;
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
+	prepare_sock_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR,
 			ANY_PORT,
 			&client_sock,
 			&client_addr);
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
+	prepare_sock_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR,
 			SERVER_PORT,
 			&server_sock,
 			&server_addr);
@@ -165,12 +168,12 @@ void test_v6_sendto_recvfrom(void)
 	struct sockaddr_in6 client_addr;
 	struct sockaddr_in6 server_addr;
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
+	prepare_sock_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 			ANY_PORT,
 			&client_sock,
 			&client_addr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
+	prepare_sock_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 			SERVER_PORT,
 			&server_sock,
 			&server_addr);
@@ -202,12 +205,12 @@ void test_v4_bind_sendto(void)
 	struct sockaddr_in client_addr;
 	struct sockaddr_in server_addr;
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
+	prepare_sock_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR,
 			CLIENT_PORT,
 			&client_sock,
 			&client_addr);
 
-	prepare_sock_v4(CONFIG_NET_APP_MY_IPV4_ADDR,
+	prepare_sock_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR,
 			SERVER_PORT,
 			&server_sock,
 			&server_addr);
@@ -244,12 +247,12 @@ void test_v6_bind_sendto(void)
 	struct sockaddr_in6 client_addr;
 	struct sockaddr_in6 server_addr;
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
+	prepare_sock_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 			CLIENT_PORT,
 			&client_sock,
 			&client_addr);
 
-	prepare_sock_v6(CONFIG_NET_APP_MY_IPV6_ADDR,
+	prepare_sock_v6(CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 			SERVER_PORT,
 			&server_sock,
 			&server_addr);

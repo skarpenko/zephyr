@@ -6,6 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL CONFIG_NET_RPL_LOG_LEVEL
+
 #include <zephyr/types.h>
 #include <ztest.h>
 #include <stdbool.h>
@@ -30,7 +33,7 @@
 #include "nbr.h"
 #include "rpl.h"
 
-#if defined(CONFIG_NET_DEBUG_RPL)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
@@ -110,8 +113,8 @@ static void set_pkt_ll_addr(struct device *dev, struct net_pkt *pkt)
 {
 	struct net_rpl_test *rpl = dev->driver_data;
 
-	struct net_linkaddr *src = net_pkt_ll_src(pkt);
-	struct net_linkaddr *dst = net_pkt_ll_dst(pkt);
+	struct net_linkaddr *src = net_pkt_lladdr_src(pkt);
+	struct net_linkaddr *dst = net_pkt_lladdr_dst(pkt);
 
 	dst->len = lladdr_src.len;
 	dst->addr = lladdr_src.addr;
@@ -135,7 +138,7 @@ static int tester_send(struct net_if *iface, struct net_pkt *pkt)
 	data_failure = false;
 
 	if (feed_data) {
-		net_pkt_ll_swap(pkt);
+		net_pkt_lladdr_swap(pkt);
 
 		if (net_recv_data(iface, pkt) < 0) {
 			TC_ERROR("Data receive failed.");
@@ -150,7 +153,7 @@ static int tester_send(struct net_if *iface, struct net_pkt *pkt)
 
 	DBG("pkt %p to be sent len %lu\n", pkt, net_pkt_get_len(pkt));
 
-#if defined(CONFIG_NET_DEBUG_RPL)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 	net_hexdump_frags("recv", pkt, false);
 #endif
 
@@ -172,7 +175,7 @@ static int tester_send(struct net_if *iface, struct net_pkt *pkt)
 		} else {
 			/* Pass sent DIO message back to us */
 			if (msg_sending == NET_RPL_DODAG_INFO_OBJ) {
-				net_pkt_ll_swap(pkt);
+				net_pkt_lladdr_swap(pkt);
 
 				if (!net_recv_data(iface, pkt)) {
 					/* We must not unref the msg,

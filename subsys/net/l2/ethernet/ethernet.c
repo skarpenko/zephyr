@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
-#define SYS_LOG_DOMAIN "net/ethernet"
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_ethernet
+#define NET_LOG_LEVEL CONFIG_NET_L2_ETHERNET_LOG_LEVEL
 
 #include <net/net_core.h>
 #include <net/net_l2.h>
@@ -16,10 +14,12 @@
 #include <net/ethernet.h>
 #include <net/ethernet_mgmt.h>
 #include <net/gptp.h>
+#include <net/lldp.h>
 
 #include "arp.h"
 #include "net_private.h"
 #include "ipv6.h"
+#include "ipv4_autoconf_internal.h"
 
 #if defined(CONFIG_NET_IPV6)
 static const struct net_eth_addr multicast_eth_addr = {
@@ -48,9 +48,8 @@ void net_eth_ipv6_mcast_to_mac_addr(const struct in6_addr *ipv6_addr,
 	memcpy(mac_addr->addr + 2, &ipv6_addr->s6_addr[12], 4);
 }
 
-#if defined(CONFIG_NET_DEBUG_L2_ETHERNET)
 #define print_ll_addrs(pkt, type, len, src, dst)			   \
-	do {								   \
+	if (NET_LOG_LEVEL >= LOG_LEVEL_DBG) {				   \
 		char out[sizeof("xx:xx:xx:xx:xx:xx")];			   \
 									   \
 		snprintk(out, sizeof(out), "%s",			   \
@@ -58,14 +57,14 @@ void net_eth_ipv6_mcast_to_mac_addr(const struct in6_addr *ipv6_addr,
 					    sizeof(struct net_eth_addr))); \
 									   \
 		NET_DBG("iface %p src %s dst %s type 0x%x len %zu",	   \
-			net_pkt_iface(pkt), out,			   \
-			net_sprint_ll_addr((dst)->addr,			   \
-					   sizeof(struct net_eth_addr)),   \
+			net_pkt_iface(pkt), log_strdup(out),		   \
+			log_strdup(net_sprint_ll_addr((dst)->addr,	   \
+					    sizeof(struct net_eth_addr))), \
 			type, (size_t)len);				   \
-	} while (0)
+	}
 
 #define print_vlan_ll_addrs(pkt, type, tci, len, src, dst)		   \
-	do {								   \
+	if (NET_LOG_LEVEL >= LOG_LEVEL_DBG) {				   \
 		char out[sizeof("xx:xx:xx:xx:xx:xx")];			   \
 									   \
 		snprintk(out, sizeof(out), "%s",			   \
@@ -74,16 +73,12 @@ void net_eth_ipv6_mcast_to_mac_addr(const struct in6_addr *ipv6_addr,
 									   \
 		NET_DBG("iface %p src %s dst %s type 0x%x tag %d pri %d "  \
 			"len %zu",					   \
-			net_pkt_iface(pkt), out,			   \
-			net_sprint_ll_addr((dst)->addr,			   \
-					   sizeof(struct net_eth_addr)),   \
+			net_pkt_iface(pkt), log_strdup(out),		   \
+			log_strdup(net_sprint_ll_addr((dst)->addr,	   \
+					    sizeof(struct net_eth_addr))), \
 			type, net_eth_vlan_get_vid(tci),		   \
 			net_eth_vlan_get_pcp(tci), (size_t)len);	   \
-	} while (0)
-#else
-#define print_ll_addrs(...)
-#define print_vlan_ll_addrs(...)
-#endif /* CONFIG_NET_DEBUG_L2_ETHERNET */
+	}
 
 static inline void ethernet_update_length(struct net_if *iface,
 					  struct net_pkt *pkt)
@@ -97,12 +92,9 @@ static inline void ethernet_update_length(struct net_if *iface,
 	 */
 
 	if (net_pkt_family(pkt) == AF_INET) {
-		len = ((NET_IPV4_HDR(pkt)->len[0] << 8) +
-		       NET_IPV4_HDR(pkt)->len[1]);
+		len = ntohs(NET_IPV4_HDR(pkt)->len);
 	} else {
-		len = ((NET_IPV6_HDR(pkt)->len[0] << 8) +
-		       NET_IPV6_HDR(pkt)->len[1]) +
-			NET_IPV6H_LEN;
+		len = ntohs(NET_IPV6_HDR(pkt)->len) + NET_IPV6H_LEN;
 	}
 
 	if (len < NET_ETH_MINIMAL_FRAME_SIZE - sizeof(struct net_eth_hdr)) {
@@ -161,18 +153,27 @@ static enum net_verdict ethernet_recv(struct net_if *iface,
 		family = AF_UNSPEC;
 		break;
 #endif
+	case NET_ETH_PTYPE_LLDP:
+#if defined(CONFIG_NET_LLDP)
+		net_pkt_set_ll_reserve(pkt, hdr_len);
+		net_buf_pull(pkt->frags, net_pkt_ll_reserve(pkt));
+		return net_lldp_recv(iface, pkt);
+#else
+		NET_DBG("LLDP Rx agent not enabled");
+		return NET_DROP;
+#endif
 	default:
 		NET_DBG("Unknown hdr type 0x%04x iface %p", type, iface);
 		return NET_DROP;
 	}
 
 	/* Set the pointers to ll src and dst addresses */
-	lladdr = net_pkt_ll_src(pkt);
+	lladdr = net_pkt_lladdr_src(pkt);
 	lladdr->addr = ((struct net_eth_hdr *)net_pkt_ll(pkt))->src.addr;
 	lladdr->len = sizeof(struct net_eth_addr);
 	lladdr->type = NET_LINK_ETHERNET;
 
-	lladdr = net_pkt_ll_dst(pkt);
+	lladdr = net_pkt_lladdr_dst(pkt);
 	lladdr->addr = ((struct net_eth_hdr *)net_pkt_ll(pkt))->dst.addr;
 	lladdr->len = sizeof(struct net_eth_addr);
 	lladdr->type = NET_LINK_ETHERNET;
@@ -181,12 +182,14 @@ static enum net_verdict ethernet_recv(struct net_if *iface,
 	if (vlan_enabled) {
 		print_vlan_ll_addrs(pkt, type, ntohs(hdr_vlan->vlan.tci),
 				    net_pkt_get_len(pkt),
-				    net_pkt_ll_src(pkt), net_pkt_ll_dst(pkt));
+				    net_pkt_lladdr_src(pkt),
+				    net_pkt_lladdr_dst(pkt));
 	} else
 #endif
 	{
 		print_ll_addrs(pkt, type, net_pkt_get_len(pkt),
-			       net_pkt_ll_src(pkt), net_pkt_ll_dst(pkt));
+			       net_pkt_lladdr_src(pkt),
+			       net_pkt_lladdr_dst(pkt));
 	}
 
 	if (!net_eth_is_addr_broadcast((struct net_eth_addr *)lladdr->addr) &&
@@ -198,8 +201,9 @@ static enum net_verdict ethernet_recv(struct net_if *iface,
 		 * are different.
 		 */
 		NET_DBG("Dropping frame, not for me [%s]",
-			net_sprint_ll_addr(net_if_get_link_addr(iface)->addr,
-					   sizeof(struct net_eth_addr)));
+			log_strdup(net_sprint_ll_addr(
+					   net_if_get_link_addr(iface)->addr,
+					   sizeof(struct net_eth_addr))));
 
 		return NET_DROP;
 	}
@@ -210,8 +214,14 @@ static enum net_verdict ethernet_recv(struct net_if *iface,
 #ifdef CONFIG_NET_ARP
 	if (family == AF_INET && type == NET_ETH_PTYPE_ARP) {
 		NET_DBG("ARP packet from %s received",
-			net_sprint_ll_addr((u8_t *)hdr->src.addr,
-					   sizeof(struct net_eth_addr)));
+			log_strdup(net_sprint_ll_addr(
+					   (u8_t *)hdr->src.addr,
+					   sizeof(struct net_eth_addr))));
+#ifdef CONFIG_NET_IPV4_AUTO
+		if (net_ipv4_autoconf_input(iface, pkt) == NET_DROP) {
+			return NET_DROP;
+		}
+#endif
 		return net_arp_input(pkt);
 	}
 #endif
@@ -235,10 +245,11 @@ static inline bool check_if_dst_is_broadcast_or_mcast(struct net_if *iface,
 	if (net_ipv4_addr_cmp(&NET_IPV4_HDR(pkt)->dst,
 			      net_ipv4_broadcast_address())) {
 		/* Broadcast address */
-		net_pkt_ll_dst(pkt)->addr = (u8_t *)broadcast_eth_addr.addr;
-		net_pkt_ll_dst(pkt)->len = sizeof(struct net_eth_addr);
-		net_pkt_ll_src(pkt)->addr = net_if_get_link_addr(iface)->addr;
-		net_pkt_ll_src(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_dst(pkt)->addr = (u8_t *)broadcast_eth_addr.addr;
+		net_pkt_lladdr_dst(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_src(pkt)->addr =
+			net_if_get_link_addr(iface)->addr;
+		net_pkt_lladdr_src(pkt)->len = sizeof(struct net_eth_addr);
 
 		return true;
 	} else if (NET_IPV4_HDR(pkt)->dst.s4_addr[0] == 224) {
@@ -252,9 +263,10 @@ static inline bool check_if_dst_is_broadcast_or_mcast(struct net_if *iface,
 
 		hdr->dst.addr[3] = hdr->dst.addr[3] & 0x7f;
 
-		net_pkt_ll_dst(pkt)->len = sizeof(struct net_eth_addr);
-		net_pkt_ll_src(pkt)->addr = net_if_get_link_addr(iface)->addr;
-		net_pkt_ll_src(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_dst(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_src(pkt)->addr =
+			net_if_get_link_addr(iface)->addr;
+		net_pkt_lladdr_src(pkt)->len = sizeof(struct net_eth_addr);
 
 		return true;
 	}
@@ -392,57 +404,82 @@ struct net_eth_hdr *net_eth_fill_header(struct ethernet_context *ctx,
 	return hdr;
 }
 
+#if defined(CONFIG_NET_IPV4_AUTO)
+static inline bool is_ipv4_auto_arp_msg(struct net_pkt *pkt)
+{
+	return net_pkt_ipv4_auto(pkt);
+}
+#else
+#define is_ipv4_auto_arp_msg(...) false
+#endif
+
 static enum net_verdict ethernet_send(struct net_if *iface,
 				      struct net_pkt *pkt)
 {
 	struct ethernet_context *ctx = net_if_l2_data(iface);
 	u16_t ptype;
 
+	/* If this is a LLDP packet, we just send it */
+	if (IS_ENABLED(CONFIG_NET_LLDP) &&
+	    ntohs(NET_ETH_HDR(pkt)->type) == NET_ETH_PTYPE_LLDP) {
+		ptype = htons(NET_ETH_PTYPE_LLDP);
+		goto send_frame;
+	}
+
 #ifdef CONFIG_NET_ARP
 	if (net_pkt_family(pkt) == AF_INET) {
 		struct net_pkt *arp_pkt;
 
 		if (check_if_dst_is_broadcast_or_mcast(iface, pkt)) {
-			if (!net_pkt_ll_dst(pkt)->addr) {
+			if (!net_pkt_lladdr_dst(pkt)->addr) {
 				struct net_eth_addr *dst;
 
 				dst = &NET_ETH_HDR(pkt)->dst;
-				net_pkt_ll_dst(pkt)->addr = (u8_t *)dst->addr;
+				net_pkt_lladdr_dst(pkt)->addr =
+					(u8_t *)dst->addr;
 			}
 
 			goto setup_hdr;
 		}
 
-		arp_pkt = net_arp_prepare(pkt);
-		if (!arp_pkt) {
-			return NET_DROP;
+		/* Trying to send ARP message so no need to setup it twice */
+		if (!is_ipv4_auto_arp_msg(pkt)) {
+			arp_pkt = net_arp_prepare(pkt, &NET_IPV4_HDR(pkt)->dst,
+						  NULL);
+			if (!arp_pkt) {
+				return NET_DROP;
+			}
+
+			if (pkt != arp_pkt) {
+				NET_DBG("Sending arp pkt %p (orig %p) to "
+					"iface %p",
+					arp_pkt, pkt, iface);
+
+				/* Either pkt went to ARP pending queue or
+				 * there was no space in the queue anymore.
+				 */
+				net_pkt_unref(pkt);
+
+				pkt = arp_pkt;
+			} else {
+				NET_DBG("Found ARP entry, sending pkt %p to "
+					"iface %p",
+					pkt, iface);
+			}
 		}
 
-		if (pkt != arp_pkt) {
-			NET_DBG("Sending arp pkt %p (orig %p) to iface %p",
-				arp_pkt, pkt, iface);
-
-			/* Either pkt went to ARP pending queue or
-			 * there was no space in the queue anymore.
-			 */
-			net_pkt_unref(pkt);
-
-			pkt = arp_pkt;
-		} else {
-			NET_DBG("Found ARP entry, sending pkt %p to iface %p",
-				pkt, iface);
-		}
-
-		net_pkt_ll_src(pkt)->addr = (u8_t *)&NET_ETH_HDR(pkt)->src;
-		net_pkt_ll_src(pkt)->len = sizeof(struct net_eth_addr);
-		net_pkt_ll_dst(pkt)->addr = (u8_t *)&NET_ETH_HDR(pkt)->dst;
-		net_pkt_ll_dst(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_src(pkt)->addr = (u8_t *)&NET_ETH_HDR(pkt)->src;
+		net_pkt_lladdr_src(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_dst(pkt)->addr = (u8_t *)&NET_ETH_HDR(pkt)->dst;
+		net_pkt_lladdr_dst(pkt)->len = sizeof(struct net_eth_addr);
 
 		/* For ARP message, we do not touch the packet further but will
 		 * send it as it is because the arp.c has prepared the packet
 		 * already.
 		 */
-		goto send;
+		ptype = htons(NET_ETH_PTYPE_ARP);
+
+		goto send_frame;
 	}
 #else
 	NET_DBG("Sending pkt %p to iface %p", pkt, iface);
@@ -454,17 +491,17 @@ static enum net_verdict ethernet_send(struct net_if *iface,
 	 * substitute the src address using the real ll address.
 	 */
 	if (net_eth_is_addr_broadcast((struct net_eth_addr *)
-					net_pkt_ll_src(pkt)->addr) ||
+					net_pkt_lladdr_src(pkt)->addr) ||
 	    net_eth_is_addr_multicast((struct net_eth_addr *)
-					net_pkt_ll_src(pkt)->addr)) {
-		net_pkt_ll_src(pkt)->addr = net_pkt_ll_if(pkt)->addr;
-		net_pkt_ll_src(pkt)->len = net_pkt_ll_if(pkt)->len;
+					net_pkt_lladdr_src(pkt)->addr)) {
+		net_pkt_lladdr_src(pkt)->addr = net_pkt_lladdr_if(pkt)->addr;
+		net_pkt_lladdr_src(pkt)->len = net_pkt_lladdr_if(pkt)->len;
 	}
 
 	/* If the destination address is not set, then use broadcast
 	 * or multicast address.
 	 */
-	if (!net_pkt_ll_dst(pkt)->addr) {
+	if (!net_pkt_lladdr_dst(pkt)->addr) {
 #if defined(CONFIG_NET_IPV6)
 		if (net_pkt_family(pkt) == AF_INET6 &&
 		    net_is_ipv6_addr_mcast(&NET_IPV6_HDR(pkt)->dst)) {
@@ -476,19 +513,20 @@ static enum net_verdict ethernet_send(struct net_if *iface,
 			       (u8_t *)(&NET_IPV6_HDR(pkt)->dst) + 12,
 				sizeof(struct net_eth_addr) - 2);
 
-			net_pkt_ll_dst(pkt)->addr = (u8_t *)dst->addr;
+			net_pkt_lladdr_dst(pkt)->addr = (u8_t *)dst->addr;
 		} else
 #endif
 		{
-			net_pkt_ll_dst(pkt)->addr =
+			net_pkt_lladdr_dst(pkt)->addr =
 				(u8_t *)broadcast_eth_addr.addr;
 		}
 
-		net_pkt_ll_dst(pkt)->len = sizeof(struct net_eth_addr);
+		net_pkt_lladdr_dst(pkt)->len = sizeof(struct net_eth_addr);
 
 		NET_DBG("Destination address was not set, using %s",
-			net_sprint_ll_addr(net_pkt_ll_dst(pkt)->addr,
-					   net_pkt_ll_dst(pkt)->len));
+			log_strdup(net_sprint_ll_addr(
+					   net_pkt_lladdr_dst(pkt)->addr,
+					   net_pkt_lladdr_dst(pkt)->len)));
 	}
 
 setup_hdr:
@@ -500,6 +538,8 @@ setup_hdr:
 		ptype = htons(NET_ETH_PTYPE_IPV6);
 	}
 
+send_frame:
+
 #if defined(CONFIG_NET_VLAN)
 	if (net_eth_is_vlan_enabled(ctx, iface)) {
 		if (set_vlan_tag(ctx, iface, pkt) == NET_DROP) {
@@ -510,15 +550,14 @@ setup_hdr:
 	}
 #endif /* CONFIG_NET_VLAN */
 
-	/* Then set the ethernet header.
+	/* Then set the ethernet header. This is not done for ARP as arp.c
+	 * has already prepared the message to be sent.
 	 */
-	net_eth_fill_header(ctx, pkt, ptype,
-			    net_pkt_ll_src(pkt)->addr,
-			    net_pkt_ll_dst(pkt)->addr);
-
-#ifdef CONFIG_NET_ARP
-send:
-#endif /* CONFIG_NET_ARP */
+	if (ptype != htons(NET_ETH_PTYPE_ARP)) {
+		net_eth_fill_header(ctx, pkt, ptype,
+				    net_pkt_lladdr_src(pkt)->addr,
+				    net_pkt_lladdr_dst(pkt)->addr);
+	}
 
 	net_if_queue_tx(iface, pkt);
 
@@ -542,11 +581,29 @@ static inline u16_t ethernet_reserve(struct net_if *iface, void *unused)
 
 static inline int ethernet_enable(struct net_if *iface, bool state)
 {
+	const struct ethernet_api *eth =
+		net_if_get_device(iface)->driver_api;
+
 	if (!state) {
 		net_arp_clear_cache(iface);
+
+		if (eth->stop) {
+			eth->stop(net_if_get_device(iface));
+		}
+	} else {
+		if (eth->start) {
+			eth->start(net_if_get_device(iface));
+		}
 	}
 
 	return 0;
+}
+
+enum net_l2_flags ethernet_flags(struct net_if *iface)
+{
+	struct ethernet_context *ctx = net_if_l2_data(iface);
+
+	return ctx->ethernet_l2_flags;
 }
 
 #if defined(CONFIG_NET_VLAN)
@@ -779,7 +836,7 @@ int net_eth_vlan_disable(struct net_if *iface, u16_t tag)
 #endif
 
 NET_L2_INIT(ETHERNET_L2, ethernet_recv, ethernet_send, ethernet_reserve,
-	    ethernet_enable);
+	    ethernet_enable, ethernet_flags);
 
 static void carrier_on(struct k_work *work)
 {
@@ -868,6 +925,32 @@ void net_eth_set_ptp_port(struct net_if *iface, int port)
 }
 #endif /* CONFIG_NET_GPTP */
 
+int net_eth_promisc_mode(struct net_if *iface, bool enable)
+{
+	struct ethernet_req_params params;
+
+	if (!(net_eth_get_hw_capabilities(iface) & ETHERNET_PROMISC_MODE)) {
+		return -ENOTSUP;
+	}
+
+	params.promisc_mode = enable;
+
+	return net_mgmt(NET_REQUEST_ETHERNET_SET_PROMISC_MODE, iface,
+			&params, sizeof(struct ethernet_req_params));
+}
+
+#if defined(CONFIG_NET_LLDP)
+int net_eth_set_lldpdu(struct net_if *iface, const struct net_lldpdu *lldpdu)
+{
+	return net_lldp_config(iface, lldpdu);
+}
+
+void net_eth_unset_lldpdu(struct net_if *iface)
+{
+	net_lldp_config(iface, NULL);
+}
+#endif
+
 void ethernet_init(struct net_if *iface)
 {
 	struct ethernet_context *ctx = net_if_l2_data(iface);
@@ -877,6 +960,12 @@ void ethernet_init(struct net_if *iface)
 #endif
 
 	NET_DBG("Initializing Ethernet L2 %p for iface %p", ctx, iface);
+
+	ctx->ethernet_l2_flags = NET_L2_MULTICAST;
+
+	if (net_eth_get_hw_capabilities(iface) & ETHERNET_PROMISC_MODE) {
+		ctx->ethernet_l2_flags |= NET_L2_PROMISC_MODE;
+	}
 
 #if defined(CONFIG_NET_VLAN)
 	if (!(net_eth_get_hw_capabilities(iface) & ETHERNET_HW_VLAN)) {

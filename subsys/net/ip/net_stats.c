@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_MODULE_NAME net_stats
+
 #if defined(CONFIG_NET_STATISTICS_PERIODIC_OUTPUT)
-#define SYS_LOG_DOMAIN "net/stats"
-#define NET_SYS_LOG_LEVEL SYS_LOG_LEVEL_INFO
-#define NET_LOG_ENABLED 1
+#define NET_LOG_LEVEL LOG_LEVEL_INF
+#else
+#define NET_LOG_LEVEL CONFIG_NET_STATISTICS_LOG_LEVEL
 #endif
 
 #include <kernel.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <net/net_core.h>
 
@@ -54,16 +57,19 @@ static const char *priority2str(enum net_priority priority)
 }
 #endif
 
+static inline s64_t cmp_val(u64_t val1, u64_t val2)
+{
+	return (s64_t)(val1 - val2);
+}
+
 static inline void stats(struct net_if *iface)
 {
-	static s64_t next_print;
-	s64_t curr = k_uptime_get();
+	static u64_t next_print;
+	u64_t curr = k_uptime_get();
+	s64_t cmp = cmp_val(curr, next_print);
 	int i;
 
-	if (!next_print || (next_print < curr &&
-	    (!((curr - next_print) > PRINT_STATISTICS_INTERVAL)))) {
-		s64_t new_print;
-
+	if (!next_print || (abs(cmp) > PRINT_STATISTICS_INTERVAL)) {
 		if (iface) {
 			NET_INFO("Interface %p [%d]", iface,
 				 net_if_get_by_iface(iface));
@@ -217,14 +223,7 @@ static inline void stats(struct net_if *iface)
 		ARG_UNUSED(i);
 #endif /* NET_TC_COUNT > 1 */
 
-		new_print = curr + PRINT_STATISTICS_INTERVAL;
-		if (new_print > curr) {
-			next_print = new_print;
-		} else {
-			/* Overflow */
-			next_print = PRINT_STATISTICS_INTERVAL -
-				(LLONG_MAX - curr);
-		}
+		next_print = curr + PRINT_STATISTICS_INTERVAL;
 	}
 }
 

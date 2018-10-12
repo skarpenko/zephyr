@@ -5,19 +5,18 @@
 
 menuconfig WEBSOCKET
 	bool "Websocket support [EXPERIMENTAL]"
-	default n
 	depends on HTTP
 	select NET_TCP
 	select BASE64
 	help
-	This option enables the websocket library.
+	  This option enables the websocket library.
 
 if WEBSOCKET
 
-config NET_DEBUG_WEBSOCKET
-	bool "Debug websocket library"
-	default n
-	help
-	Enables websocket library to output debug messages
+module = WEBSOCKET
+module-dep = NET_LOG
+module-str = Log level for weboscket library
+module-help = Enables websocket library to output debug messages.
+source "subsys/net/Kconfig.template.log_config.net"
 
 endif # WEBSOCKET

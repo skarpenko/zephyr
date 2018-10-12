@@ -6,11 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if 1
-#define SYS_LOG_DOMAIN "echo-server"
-#define NET_SYS_LOG_LEVEL SYS_LOG_LEVEL_DEBUG
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_echo_server_tcp
+#define NET_LOG_LEVEL LOG_LEVEL_DBG
 
 #include <zephyr.h>
 #include <errno.h>
@@ -123,7 +120,7 @@ static void tcp_received(struct net_app_ctx *ctx,
 	snprintk(dbg, MAX_DBG_PRINT, "TCP IPv%c",
 		 family == AF_INET6 ? '6' : '4');
 
-	reply_pkt = build_reply_pkt(dbg, ctx, pkt);
+	reply_pkt = build_reply_pkt(dbg, ctx, pkt, NET_TCPH_LEN);
 
 	net_pkt_unref(pkt);
 

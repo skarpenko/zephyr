@@ -11,6 +11,9 @@
  * we get proper data back.
  */
 
+#define LOG_MODULE_NAME net_test
+#define NET_LOG_LEVEL CONFIG_WEBSOCKET_LOG_LEVEL
+
 #include <ztest.h>
 
 #include <net/net_ip.h>
@@ -20,7 +23,7 @@
 static struct net_app_ctx app_ctx_v6;
 static struct net_app_ctx app_ctx_v4;
 
-#if defined(CONFIG_NET_DEBUG_WEBSOCKET)
+#if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #define DBG(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #define NET_LOG_ENABLED 1
 #else
@@ -217,7 +220,7 @@ static void test_send_recv(int chunk_size, struct net_app_ctx *ctx)
 
 	for (i = 0; i < sizeof(ws_test_msg); i += chunk_size) {
 		for (j = 0;
-		     IS_ENABLED(CONFIG_NET_DEBUG_WEBSOCKET) && j < chunk_size;
+		     (NET_LOG_LEVEL >= LOG_LEVEL_DBG) && j < chunk_size;
 		     j++) {
 			if ((i + chunk_size) >= sizeof(ws_test_msg)) {
 				break;
@@ -276,7 +279,7 @@ static void test_send_multi_msg(struct net_app_ctx *ctx)
 
 	for (i = 0; i < sizeof(ws_big_msg); i += chunk_size) {
 		for (j = 0;
-		     IS_ENABLED(CONFIG_NET_DEBUG_WEBSOCKET) && j < chunk_size;
+		     (NET_LOG_LEVEL >= LOG_LEVEL_DBG) && j < chunk_size;
 		     j++) {
 			int first_msg = 0;
 
@@ -330,15 +333,15 @@ void test_v6_init(void)
 {
 	int ret;
 
-	ret = net_ipaddr_parse(CONFIG_NET_APP_MY_IPV6_ADDR,
-			       strlen(CONFIG_NET_APP_MY_IPV6_ADDR),
+	ret = net_ipaddr_parse(CONFIG_NET_CONFIG_MY_IPV6_ADDR,
+			       strlen(CONFIG_NET_CONFIG_MY_IPV6_ADDR),
 			       &server_addr);
 	zassert_equal(ret, 1, "cannot parse server address");
 
 	ret = net_app_init_tcp_client(&app_ctx_v6,
 				      NULL,
 				      NULL,
-				      CONFIG_NET_APP_MY_IPV6_ADDR,
+				      CONFIG_NET_CONFIG_MY_IPV6_ADDR,
 				      80,
 				      0,
 				      NULL);
@@ -453,15 +456,15 @@ void test_v4_init(void)
 {
 	int ret;
 
-	ret = net_ipaddr_parse(CONFIG_NET_APP_MY_IPV4_ADDR,
-			       strlen(CONFIG_NET_APP_MY_IPV4_ADDR),
+	ret = net_ipaddr_parse(CONFIG_NET_CONFIG_MY_IPV4_ADDR,
+			       strlen(CONFIG_NET_CONFIG_MY_IPV4_ADDR),
 			       &server_addr);
 	zassert_equal(ret, 1, "cannot parse server address");
 
 	ret = net_app_init_tcp_client(&app_ctx_v4,
 				      NULL,
 				      NULL,
-				      CONFIG_NET_APP_MY_IPV4_ADDR,
+				      CONFIG_NET_CONFIG_MY_IPV4_ADDR,
 				      80,
 				      0,
 				      NULL);
@@ -569,10 +572,6 @@ void test_v4_send_multi_msg(void)
 	test_send_multi_msg(&app_ctx_v4);
 }
 
-static void test_setup(void)
-{
-	return;
-}
 void test_main(void)
 {
 	ztest_test_suite(websocket,
@@ -588,7 +587,7 @@ void test_main(void)
 			 ztest_unit_test(test_v6_send_recv_6),
 			 ztest_unit_test(test_v6_send_recv_7),
 			 ztest_unit_test(test_v6_send_multi_msg),
-			 ztest_unit_test_setup_teardown(test_v6_close, test_setup, websocket_cleanup_server),
+			 ztest_unit_test(test_v6_close),
 			 ztest_unit_test(test_websocket_init_server),
 			 ztest_unit_test(test_v4_init),
 			 ztest_unit_test(test_v4_connect),
@@ -600,7 +599,7 @@ void test_main(void)
 			 ztest_unit_test(test_v4_send_recv_6),
 			 ztest_unit_test(test_v4_send_recv_7),
 			 ztest_unit_test(test_v4_send_multi_msg),
-			 ztest_unit_test_setup_teardown(test_v4_close, test_setup, websocket_cleanup_server)
+			 ztest_unit_test(test_v4_close)
 			 );
 
 	ztest_run_test_suite(websocket);
