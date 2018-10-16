@@ -6,7 +6,7 @@ config SOC
 
 config SYS_CLOCK_HW_CYCLES_PER_SEC
 	int
-	default 5000000
+	default 65000000
 
 config NUM_IRQS
 	int

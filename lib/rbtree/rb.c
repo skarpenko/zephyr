@@ -26,7 +26,21 @@ static struct rbnode *get_child(struct rbnode *n, int side)
 
 	uintptr_t l = (uintptr_t) n->children[0];
 
+/* WARNING!
+ * When get_child() function is inlined "l &= ~1ul" makes the compiler a bit
+ * paranoid about alignment and it generates sequence of lwl and lwr
+ * instructions instead of one lw instruction to load child address from rbnode.
+ * Since compiler assumes that the address might not be 4-byte aligned in that
+ * case. Unfortunately lwl and lwr instructions are not supported by Ultiparc
+ * and some other MIPS implementations. Changing "l &= ~1ul" to "l &= ~3ul"
+ * solves the problem.
+*/
+#if defined(CONFIG_ULTIPARC)
+	l &= ~3ul;
+#else
 	l &= ~1ul;
+#endif
+
 	return (struct rbnode *) l;
 }
 
