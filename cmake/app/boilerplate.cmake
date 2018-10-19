@@ -63,7 +63,7 @@ set_property(GLOBAL PROPERTY GENERATED_KERNEL_OBJECT_FILES "")
 define_property(GLOBAL PROPERTY GENERATED_KERNEL_SOURCE_FILES
   BRIEF_DOCS "Source files that are generated after Zephyr has been linked once."
   FULL_DOCS "\
-Object files that are generated after Zephyr has been linked once.\
+Source files that are generated after Zephyr has been linked once.\
 May include isr_tables.c etc."
   )
 set_property(GLOBAL PROPERTY GENERATED_KERNEL_SOURCE_FILES "")
@@ -350,3 +350,11 @@ foreach(boilerplate_lib ${ZEPHYR_INTERFACE_LIBS_PROPERTY})
     ${boilerplate_lib}
     )
 endforeach()
+
+if("${CMAKE_EXTRA_GENERATOR}" STREQUAL "Eclipse CDT4")
+  # Call the amendment function before .project and .cproject generation
+  # C and CXX includes, defines in .cproject without __cplusplus
+  # with project includes and defines
+  include(${ZEPHYR_BASE}/cmake/ide/eclipse_cdt4_generator_amendment.cmake)
+  eclipse_cdt4_generator_amendment(1)
+endif()

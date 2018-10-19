@@ -22,9 +22,6 @@ GTEXT(__swap)
 GTEXT(_irq_do_offload)
 GTEXT(_offload_routine)
 #endif
-#ifdef CONFIG_TIMESLICING
-GTEXT(_update_time_slice_before_swap)
-#endif
 
 
 .set noreorder
@@ -135,17 +132,6 @@ on_irq_stack:
 	 * switch
 	 */
 
-	/*
-	 * Non-preemptible thread ? Do not schedule (see explanation of
-	 * preempt field in kernel_struct.h).
-	 */
-	lhu $t2, _thread_offset_to_preempt($t1)
-	lui $t3, %hi(_NON_PREEMPT_THRESHOLD)
-	addiu $t3, %lo(_NON_PREEMPT_THRESHOLD)
-	sltu $t2, $t3, $t2
-	bne $t2, $zero, no_reschedule
-	nop
-
 	/* Call into the kernel to see if a scheduling decision is necessary */
 	lw $t2, _kernel_offset_to_ready_q_cache($t0)
 	nop
@@ -165,11 +151,6 @@ on_irq_stack:
 	 */
 	lw $sp, 0($sp)
 	nop
-
-#ifdef CONFIG_TIMESLICING
-	jal _update_time_slice_before_swap
-	nop
-#endif
 
 	/* Argument to Swap() is IRQ status since that's the state of the
 	 * status register before the exception happened. When coming

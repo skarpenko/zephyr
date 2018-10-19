@@ -33,9 +33,9 @@ static void ultiparc_timer_irq_handler(void *unused)
 {
 	ARG_UNUSED(unused);
 
-	accumulated_cycle_count += sys_clock_hw_cycles_per_tick;
+	accumulated_cycle_count += sys_clock_hw_cycles_per_tick();
 
-	_sys_clock_tick_announce();
+	z_clock_announce(1);
 }
 
 
@@ -44,7 +44,7 @@ static void ultiparc_timer_irq_handler(void *unused)
 #endif
 
 
-int _sys_clock_driver_init(struct device *device)
+int z_clock_driver_init(struct device *device)
 {
 	ARG_UNUSED(device);
 
@@ -56,9 +56,9 @@ int _sys_clock_driver_init(struct device *device)
 
 	/*
 	 * Reset counter and set timer to generate interrupt
-	 * every sys_clock_hw_cycles_per_tick
+	 * every sys_clock_hw_cycles_per_tick()
 	 */
-	sys_write32(sys_clock_hw_cycles_per_tick, TIMER_INTVL_REG);
+	sys_write32(sys_clock_hw_cycles_per_tick(), TIMER_INTVL_REG);
 	sys_write32(TIMER_EN | TIMER_IE | TIMER_RLD, TIMER_CTRL_REG);
 
 
@@ -77,6 +77,12 @@ int _sys_clock_driver_init(struct device *device)
  */
 u32_t _timer_cycle_get_32(void)
 {
-	u32_t curv = sys_clock_hw_cycles_per_tick - sys_read32(TIMER_CURRV_REG);
+	u32_t curv = sys_clock_hw_cycles_per_tick() - sys_read32(TIMER_CURRV_REG);
 	return accumulated_cycle_count + curv;
+}
+
+
+u32_t z_clock_elapsed(void)
+{
+	return 0;
 }
