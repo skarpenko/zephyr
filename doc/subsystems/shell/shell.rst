@@ -31,6 +31,7 @@ The module can be connected to any transport for command input and output.
 At this point, the following transport layers are implemented:
 
 * UART
+* DUMMY - not a physical transport layer
 
 See the :ref:`shell_api` documentation for more information.
 
@@ -168,6 +169,27 @@ that is found deepest in the command tree and further subcommands (without a
 handler) are passed as arguments. Characters within parentheses are treated
 as one argument. If shell wont find a handler it will display an error message.
 
+Commands can be also executed from a user application using any active backend
+and a function :cpp:func:`shell_execute_cmd`, as shown in this example:
+
+.. code-block:: c
+
+	void main(void)
+	{
+		/* Below code will execute "clear" command on a DUMMY backend */
+		shell_execute_cmd(NULL, "clear");
+
+		/* Below code will execute "shell colors off" command on
+		 * an UART backend
+		 */
+		shell_execute_cmd(shell_backend_uart_get_ptr(),
+				  "shell colors off");
+	}
+
+Enable the DUMMY backend by setting the Kconfig
+:option:`CONFIG_SHELL_BACKEND_DUMMY` option.
+
+
 Command handler
 ----------------
 
@@ -228,8 +250,10 @@ checks for valid arguments count.
 		 *
 		 * Each of these actions can be deactivated in Kconfig.
 		 */
-		if (!shell_cmd_precheck(shell, (argc <= 2), NULL, 0) {
-			return 0;
+		int err = shell_cmd_precheck(shell, (argc <= 2), NULL, 0);
+
+		if (err) {
+			return err;
 		}
 
 		shell_fprintf(shell, SHELL_NORMAL,
@@ -271,6 +295,7 @@ in command handler.
 	static int cmd_with_options(const struct shell *shell, size_t argc,
 			            char **argv)
 	{
+		int err;
 		/* Dummy options showing options usage */
 		static const struct shell_getopt_option opt[] = {
 			SHELL_OPT(
@@ -288,9 +313,10 @@ in command handler.
 		/* If command will be called with -h or --help option
 		 * all declared options will be listed in the help message
 		 */
-		if (!shell_cmd_precheck(shell, (argc <= 2), opt,
-					  sizeof(opt)/sizeof(opt[1]))) {
-			return 0;
+		err = shell_cmd_precheck(shell, (argc <= 2), opt,
+					 sizeof(opt)/sizeof(opt[1]));
+		if (err) {
+			return err;
 		}
 
 		/* checking if command was called with test option */

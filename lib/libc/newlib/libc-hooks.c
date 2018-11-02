@@ -104,8 +104,9 @@ Z_SYSCALL_HANDLER(_zephyr_read, buf, nbytes)
 }
 #endif
 
-int _impl__zephyr_write(char *buf, int nbytes)
+int _impl__zephyr_write(const void *buffer, int nbytes)
 {
+	const char *buf = buffer;
 	int i;
 
 	for (i = 0; i < nbytes; i++) {
@@ -121,7 +122,7 @@ int _impl__zephyr_write(char *buf, int nbytes)
 Z_SYSCALL_HANDLER(_zephyr_write, buf, nbytes)
 {
 	Z_OOPS(Z_SYSCALL_MEMORY_READ(buf, nbytes));
-	return _impl__zephyr_write((char *)buf, nbytes);
+	return _impl__zephyr_write((const void *)buf, nbytes);
 }
 #endif
 
@@ -134,7 +135,7 @@ int _read(int fd, char *buf, int nbytes)
 }
 FUNC_ALIAS(_read, read, int);
 
-int _write(int fd, char *buf, int nbytes)
+int _write(int fd, const void *buf, int nbytes)
 {
 	ARG_UNUSED(fd);
 
@@ -160,7 +161,7 @@ int _lseek(int file, int ptr, int dir)
 }
 FUNC_ALIAS(_lseek, lseek, int);
 #else
-extern ssize_t write(int file, char *buffer, unsigned int count);
+extern ssize_t write(int file, const char *buffer, size_t count);
 #define _write	write
 #endif
 
