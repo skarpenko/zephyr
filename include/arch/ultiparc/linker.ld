@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+ * Copyright (c) 2018-2019 Stepan Karpenko <stepan.karpenko@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -39,6 +39,9 @@ MEMORY
 
 SECTIONS
 {
+
+/* #include <linker/rel-sections.ld> */
+
 	GROUP_START(ROMABLE_REGION)
 	_image_rom_start = ULTIPARC_RAM_BASE;
 
@@ -169,5 +172,7 @@ SECTIONS
 #ifdef CONFIG_GEN_ISR_TABLES
 #include <linker/intlist.ld>
 #endif
+
+#include <linker/debug-sections.ld>
 
 }
