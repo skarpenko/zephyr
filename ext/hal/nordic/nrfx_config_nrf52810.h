@@ -51,6 +51,12 @@
 #define NRFX_CLOCK_CONFIG_LF_SRC 1
 #endif
 
+// <q> NRFX_CLOCK_CONFIG_LF_CAL_ENABLED  - Enables LF Clock Calibration Support
+
+#ifndef NRFX_CLOCK_CONFIG_LF_CAL_ENABLED
+#define NRFX_CLOCK_CONFIG_LF_CAL_ENABLED 0
+#endif
+
 // <o> NRFX_CLOCK_CONFIG_IRQ_PRIORITY  - Interrupt priority
 
 // <0=> 0 (highest)
@@ -260,8 +266,8 @@
 
 // <e> NRFX_GPIOTE_ENABLED - nrfx_gpiote - GPIOTE peripheral driver
 //==========================================================
-#ifndef NRFX_GPIOTE_ENABLED
-#define NRFX_GPIOTE_ENABLED 0
+#ifdef CONFIG_NRFX_GPIOTE
+#define NRFX_GPIOTE_ENABLED 1
 #endif
 // <o> NRFX_GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS - Number of lower power input pins
 #ifndef NRFX_GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS
@@ -479,8 +485,8 @@
 
 // <e> NRFX_PPI_ENABLED - nrfx_ppi - PPI peripheral allocator
 //==========================================================
-#ifndef NRFX_PPI_ENABLED
-#define NRFX_PPI_ENABLED 0
+#ifdef CONFIG_NRFX_PPI
+#define NRFX_PPI_ENABLED 1
 #endif
 // <e> NRFX_PPI_CONFIG_LOG_ENABLED - Enables logging in the module.
 //==========================================================
@@ -2026,6 +2032,15 @@
 
 #ifndef NRFX_WDT_CONFIG_RELOAD_VALUE
 #define NRFX_WDT_CONFIG_RELOAD_VALUE 2000
+#endif
+
+// <o> NRFX_WDT_CONFIG_NO_IRQ  - Remove WDT IRQ handling from WDT driver
+
+// <0=> Include WDT IRQ handling
+// <1=> Remove WDT IRQ handling
+
+#ifndef NRFX_WDT_CONFIG_NO_IRQ
+#define NRFX_WDT_CONFIG_NO_IRQ 0
 #endif
 
 // <o> NRFX_WDT_CONFIG_IRQ_PRIORITY  - Interrupt priority

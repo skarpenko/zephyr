@@ -11,6 +11,11 @@
 #include <errno.h>
 #include <bluetooth/l2cap.h>
 #include <misc/byteorder.h>
+
+#include <logging/log.h>
+#define LOG_MODULE_NAME bttester_l2cap
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include "bttester.h"
 
 #define CONTROLLER_INDEX 0
@@ -117,7 +122,7 @@ static struct channel *get_free_channel()
 	u8_t i;
 	struct channel *chan;
 
-	for (i = 0; i < CHANNELS; i++) {
+	for (i = 0U; i < CHANNELS; i++) {
 		if (channels[i].le.chan.state != BT_L2CAP_DISCONNECTED) {
 			continue;
 		}
@@ -231,7 +236,7 @@ static struct bt_l2cap_server *get_free_server(void)
 {
 	u8_t i;
 
-	for (i = 0; i < SERVERS ; i++) {
+	for (i = 0U; i < SERVERS ; i++) {
 		if (servers[i].psm) {
 			continue;
 		}
@@ -246,7 +251,7 @@ static bool is_free_psm(u16_t psm)
 {
 	u8_t i;
 
-	for (i = 0; i < ARRAY_SIZE(servers); i++) {
+	for (i = 0U; i < ARRAY_SIZE(servers); i++) {
 		if (servers[i].psm == psm) {
 			return false;
 		}

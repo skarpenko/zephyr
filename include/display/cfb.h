@@ -21,7 +21,7 @@ extern "C" {
 
 /**
  * @brief Display Drivers
- * @defgroup display_interfaces Display Drivers
+ * @addtogroup display_interfaces Display Drivers
  * @{
  * @}
  */
@@ -60,7 +60,7 @@ struct cfb_font {
  *
  * @param _name   Name of the font entry.
  * @param _width  Width of the font in pixels
- * @param _height Heigth of the font in pixels.
+ * @param _height Height of the font in pixels.
  * @param _caps   Font capabilities.
  * @param _data   Raw data of the font.
  * @param _fc     Character mapped to first font element.
@@ -99,6 +99,15 @@ int cfb_print(struct device *dev, char *str, u16_t x, u16_t y);
  * @return 0 on success, negative value otherwise
  */
 int cfb_framebuffer_clear(struct device *dev, bool clear_display);
+
+/**
+ * @brief Invert Pixels.
+ *
+ * @param dev Pointer to device structure for driver instance
+ *
+ * @return 0 on success, negative value otherwise
+ */
+int cfb_framebuffer_invert(struct device *dev);
 
 /**
  * @brief Finalize framebuffer and write it to display RAM,
@@ -141,6 +150,15 @@ int cfb_framebuffer_set_font(struct device *dev, u8_t idx);
  * @return 0 on success, negative value otherwise
  */
 int cfb_get_font_size(struct device *dev, u8_t idx, u8_t *width, u8_t *height);
+
+/**
+ * @brief Get number of fonts.
+ *
+ * @param dev Pointer to device structure for driver instance
+ *
+ * @return number of fonts
+ */
+int cfb_get_numof_fonts(struct device *dev);
 
 /**
  * @brief Initialize Character Framebuffer.

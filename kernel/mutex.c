@@ -209,6 +209,7 @@ Z_SYSCALL_HANDLER(k_mutex_lock, mutex, timeout)
 void _impl_k_mutex_unlock(struct k_mutex *mutex)
 {
 	u32_t key;
+	struct k_thread *new_owner;
 
 	__ASSERT(mutex->lock_count > 0U, "");
 	__ASSERT(mutex->owner == _current, "");
@@ -218,11 +219,11 @@ void _impl_k_mutex_unlock(struct k_mutex *mutex)
 
 	RECORD_STATE_CHANGE();
 
-	mutex->lock_count--;
 
 	K_DEBUG("mutex %p lock_count: %d\n", mutex, mutex->lock_count);
 
-	if (mutex->lock_count != 0U) {
+	if (mutex->lock_count - 1U != 0U) {
+		mutex->lock_count--;
 		goto k_mutex_unlock_return;
 	}
 
@@ -230,7 +231,7 @@ void _impl_k_mutex_unlock(struct k_mutex *mutex)
 
 	adjust_owner_prio(mutex, mutex->owner_orig_prio);
 
-	struct k_thread *new_owner = _unpend_first_thread(&mutex->wait_q);
+	new_owner = _unpend_first_thread(&mutex->wait_q);
 
 	mutex->owner = new_owner;
 
@@ -249,8 +250,9 @@ void _impl_k_mutex_unlock(struct k_mutex *mutex)
 		 * waiter since the wait queue is priority-based: no need to
 		 * ajust its priority
 		 */
-		mutex->lock_count++;
 		mutex->owner_orig_prio = new_owner->base.prio;
+	} else {
+		mutex->lock_count = 0;
 	}
 
 	irq_unlock(key);

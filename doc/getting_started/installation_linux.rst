@@ -54,6 +54,8 @@ On Arch Linux:
 
    sudo pacman -Syu
 
+.. _linux_requirements:
+
 Install Requirements and Dependencies
 *************************************
 
@@ -100,16 +102,40 @@ On Arch:
    sudo pacman -S git cmake ninja gperf ccache dfu-util dtc wget \
        python-pip python-setuptools python-wheel xz file make
 
-CMake version 3.8.2 or higher is required. Check what version you have using
-``cmake --version``; if you have an older version, check the backports or
-install a more recent version manually. For example, to install version
-3.8.2 from the CMake website directly in ~/cmake::
+.. important::
+   Zephyr requires a recent version of CMake. Read through
+   the rest of the section below to verify the version you have
+   installed is recent enough to build Zephyr.
 
-   mkdir $HOME/cmake && cd $HOME/cmake
-   wget https://cmake.org/files/v3.8/cmake-3.8.2-Linux-x86_64.sh
-   yes | sh cmake-3.8.2-Linux-x86_64.sh | cat
-   echo "export PATH=$PWD/cmake-3.8.2-Linux-x86_64/bin:\$PATH" >> $HOME/.zephyrrc
-   cmake --version
+CMake version 3.13.1 or higher is required. Check what version you have by using
+``cmake --version``. If you have an older version, there are several ways
+of obtaining a more recent one:
+
+* Use ``pip``:
+
+  .. code-block:: console
+
+     pip3 install --user cmake
+
+* Download and install from the pre-built binaries provided by the CMake
+  project itself in the `CMake Downloads`_ page.
+  For example, to install version 3.13.1 in :file:`~/bin/cmake`:
+
+  .. code-block:: console
+
+     mkdir $HOME/bin/cmake && cd $HOME/bin/cmake
+     wget https://github.com/Kitware/CMake/releases/download/v3.13.1/cmake-3.13.1-Linux-x86_64.sh
+     yes | sh cmake-3.13.1-Linux-x86_64.sh | cat
+     echo "export PATH=$PWD/cmake-3.13.1-Linux-x86_64/bin:\$PATH" >> $HOME/.zephyrrc
+
+* Check your distribution's beta or unstable release package library for an
+  update.
+
+.. note::
+   If you have installed a recent version of CMake using one of the approaches
+   listed above, you might want to uninstall the one provided by your
+   distribution's package manager (``apt``, ``dnf``, ``swupd``, ``pacman``,
+   etc.) in order to avoid version conflicts.
 
 .. _zephyr_sdk:
 
@@ -148,9 +174,9 @@ Follow these steps to install the SDK on your Linux host system.
 
    .. code-block:: console
 
-      wget https://github.com/zephyrproject-rtos/meta-zephyr-sdk/releases/download/0.9.3/zephyr-sdk-0.9.3-setup.run
+      wget https://github.com/zephyrproject-rtos/meta-zephyr-sdk/releases/download/0.9.5/zephyr-sdk-0.9.5-setup.run
 
-   (You can change *0.9.3* to another version if needed; the `Zephyr
+   (You can change *0.9.5* to another version if needed; the `Zephyr
    Downloads`_ page contains all available SDK releases.)
 
 #. Run the installation binary:
@@ -158,7 +184,7 @@ Follow these steps to install the SDK on your Linux host system.
    .. code-block:: console
 
       cd <sdk download directory>
-      sh zephyr-sdk-0.9.3-setup.run
+      sh zephyr-sdk-0.9.5-setup.run
 
    .. important::
       If this fails, make sure Zephyr's dependencies were installed
@@ -205,3 +231,4 @@ To make sure this variable is unset, run:
    unset ZEPHYR_SDK_INSTALL_DIR
 
 .. _Zephyr Downloads: https://www.zephyrproject.org/developers/#downloads
+.. _CMake Downloads: https://cmake.org/download

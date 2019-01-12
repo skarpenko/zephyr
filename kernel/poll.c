@@ -24,6 +24,7 @@
 #include <misc/dlist.h>
 #include <misc/util.h>
 #include <misc/__assert.h>
+#include <stdbool.h>
 
 void k_poll_event_init(struct k_poll_event *event, u32_t type,
 		       int mode, void *obj)
@@ -43,35 +44,35 @@ void k_poll_event_init(struct k_poll_event *event, u32_t type,
 }
 
 /* must be called with interrupts locked */
-static inline int is_condition_met(struct k_poll_event *event, u32_t *state)
+static inline bool is_condition_met(struct k_poll_event *event, u32_t *state)
 {
 	switch (event->type) {
 	case K_POLL_TYPE_SEM_AVAILABLE:
 		if (k_sem_count_get(event->sem) > 0) {
 			*state = K_POLL_STATE_SEM_AVAILABLE;
-			return 1;
+			return true;
 		}
 		break;
 	case K_POLL_TYPE_DATA_AVAILABLE:
 		if (!k_queue_is_empty(event->queue)) {
 			*state = K_POLL_STATE_FIFO_DATA_AVAILABLE;
-			return 1;
+			return true;
 		}
 		break;
 	case K_POLL_TYPE_SIGNAL:
-		if (event->signal->signaled) {
+		if (event->signal->signaled != 0) {
 			*state = K_POLL_STATE_SIGNALED;
-			return 1;
+			return true;
 		}
 		break;
 	case K_POLL_TYPE_IGNORE:
-		return 0;
+		break;
 	default:
 		__ASSERT(false, "invalid event type (0x%x)\n", event->type);
 		break;
 	}
 
-	return 0;
+	return false;
 }
 
 static inline void add_event(sys_dlist_t *events, struct k_poll_event *event,
@@ -183,7 +184,7 @@ int _impl_k_poll(struct k_poll_event *events, int num_events, s32_t timeout)
 	int last_registered = -1, rc;
 	unsigned int key;
 
-	struct _poller poller = { .thread = _current, .is_polling = 1, };
+	struct _poller poller = { .thread = _current, .is_polling = true, };
 
 	/* find events whose condition is already fulfilled */
 	for (int ii = 0; ii < num_events; ii++) {
@@ -192,7 +193,7 @@ int _impl_k_poll(struct k_poll_event *events, int num_events, s32_t timeout)
 		key = irq_lock();
 		if (is_condition_met(&events[ii], &state)) {
 			set_event_ready(&events[ii], state);
-			poller.is_polling = 0;
+			poller.is_polling = false;
 		} else if (timeout != K_NO_WAIT && poller.is_polling) {
 			rc = register_event(&events[ii], &poller);
 			if (rc == 0) {
@@ -217,7 +218,7 @@ int _impl_k_poll(struct k_poll_event *events, int num_events, s32_t timeout)
 		return 0;
 	}
 
-	poller.is_polling = 0;
+	poller.is_polling = false;
 
 	if (timeout == K_NO_WAIT) {
 		irq_unlock(key);
@@ -331,7 +332,7 @@ static int signal_poll_event(struct k_poll_event *event, u32_t state)
 	__ASSERT(event->poller->thread != NULL,
 		 "poller should have a thread\n");
 
-	event->poller->is_polling = 0;
+	event->poller->is_polling = false;
 
 	if (!_is_thread_pending(thread)) {
 		goto ready_event;
@@ -403,7 +404,7 @@ Z_SYSCALL_HANDLER(k_poll_signal_check, signal, signaled, result)
 }
 #endif
 
-int _impl_k_poll_signal(struct k_poll_signal *signal, int result)
+int _impl_k_poll_signal_raise(struct k_poll_signal *signal, int result)
 {
 	unsigned int key = irq_lock();
 	struct k_poll_event *poll_event;
@@ -424,10 +425,10 @@ int _impl_k_poll_signal(struct k_poll_signal *signal, int result)
 }
 
 #ifdef CONFIG_USERSPACE
-Z_SYSCALL_HANDLER(k_poll_signal, signal, result)
+Z_SYSCALL_HANDLER(k_poll_signal_raise, signal, result)
 {
 	Z_OOPS(Z_SYSCALL_OBJ(signal, K_OBJ_POLL_SIGNAL));
-	return _impl_k_poll_signal((struct k_poll_signal *)signal, result);
+	return _impl_k_poll_signal_raise((struct k_poll_signal *)signal, result);
 }
 Z_SYSCALL_HANDLER1_SIMPLE_VOID(k_poll_signal_reset, K_OBJ_POLL_SIGNAL,
 			       struct k_poll_signal *);

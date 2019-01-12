@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8.2)
+cmake_minimum_required(VERSION 3.13.1)
 
 macro(set_conf_file)
   if(EXISTS ${APPLICATION_SOURCE_DIR}/prj_${BOARD}.conf)
@@ -26,5 +26,4 @@ target_sources(app PRIVATE
 
 target_include_directories(app PRIVATE
   $ENV{ZEPHYR_BASE}/subsys/net/ip
-  $ENV{ZEPHYR_BASE}/samples/task_profiler/profiler/src
   )

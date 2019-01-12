@@ -1,7 +1,7 @@
 .. _introducing_zephyr:
 
-Introducing Zephyr
-##################
+Introduction
+############
 
 The Zephyr OS is based on a small-footprint kernel designed for use on
 resource-constrained and embedded systems: from simple embedded environmental
@@ -30,7 +30,7 @@ as described in :ref:`Zephyr_Licensing`.
 Distinguishing Features
 ***********************
 
-Zephyr offers a large and evergrowing number of features including:
+Zephyr offers a large and ever growing number of features including:
 
 **Extensive suite of Kernel services**
    Zephyr offers a number of familiar services for development:

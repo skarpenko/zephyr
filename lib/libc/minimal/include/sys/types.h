@@ -28,9 +28,11 @@ typedef int off_t;
 typedef int off_t;
 #elif defined(__NIOS2__)
 typedef int off_t;
-#elif defined(__riscv__)
+#elif defined(__riscv)
 typedef int off_t;
 #elif defined(__XTENSA__)
+typedef int off_t;
+#elif defined(__mips__)
 typedef int off_t;
 #else
 #error "The minimal libc library does not recognize the architecture!\n"

@@ -12,6 +12,11 @@
 #include <bluetooth/mesh.h>
 #include <bluetooth/testing.h>
 #include <misc/byteorder.h>
+
+#include <logging/log.h>
+#define LOG_MODULE_NAME bttester_mesh
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include "bttester.h"
 
 #define CONTROLLER_INDEX 0
@@ -119,7 +124,7 @@ static void get_faults(u8_t *faults, u8_t faults_size, u8_t *dst, u8_t *count)
 {
 	u8_t i, limit = *count;
 
-	for (i = 0, *count = 0; i < faults_size && *count < limit; i++) {
+	for (i = 0U, *count = 0U; i < faults_size && *count < limit; i++) {
 		if (faults[i]) {
 			*dst++ = faults[i];
 			(*count)++;
