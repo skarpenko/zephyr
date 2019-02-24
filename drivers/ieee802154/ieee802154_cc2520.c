@@ -541,9 +541,9 @@ static inline u8_t read_rxfifo_length(struct cc2520_context *ctx)
 }
 
 static inline bool read_rxfifo_content(struct cc2520_context *ctx,
-				       struct net_buf *frag, u8_t len)
+				       struct net_buf *buf, u8_t len)
 {
-	if (!_cc2520_access(ctx, true, CC2520_INS_RXBUF, 0, frag->data, len)) {
+	if (!_cc2520_access(ctx, true, CC2520_INS_RXBUF, 0, buf->data, len)) {
 		return false;
 	}
 
@@ -552,7 +552,7 @@ static inline bool read_rxfifo_content(struct cc2520_context *ctx,
 		return false;
 	}
 
-	net_buf_add(frag, len);
+	net_buf_add(buf, len);
 
 	return true;
 }
@@ -616,7 +616,6 @@ static void cc2520_rx(int arg)
 {
 	struct device *dev = INT_TO_POINTER(arg);
 	struct cc2520_context *cc2520 = dev->driver_data;
-	struct net_buf *pkt_frag = NULL;
 	struct net_pkt *pkt;
 	u8_t pkt_len;
 
@@ -638,25 +637,18 @@ static void cc2520_rx(int arg)
 			goto flush;
 		}
 
-		pkt = net_pkt_get_reserve_rx(K_NO_WAIT);
+		pkt = net_pkt_alloc_with_buffer(cc2520->iface, pkt_len,
+						AF_UNSPEC, 0, K_NO_WAIT);
 		if (!pkt) {
 			LOG_ERR("No pkt available");
 			goto flush;
 		}
 
-		pkt_frag = net_pkt_get_frag(pkt, K_NO_WAIT);
-		if (!pkt_frag) {
-			LOG_ERR("No pkt_frag available");
-			goto flush;
-		}
-
-		net_pkt_frag_insert(pkt, pkt_frag);
-
 		if (!IS_ENABLED(CONFIG_IEEE802154_RAW_MODE)) {
 			pkt_len -= 2;
 		}
 
-		if (!read_rxfifo_content(cc2520, pkt_frag, pkt_len)) {
+		if (!read_rxfifo_content(cc2520, pkt->buffer, pkt_len)) {
 			LOG_ERR("No content read");
 			goto flush;
 		}
@@ -985,7 +977,7 @@ static inline int configure_spi(struct device *dev)
 {
 	struct cc2520_context *cc2520 = dev->driver_data;
 
-	cc2520->spi = device_get_binding(DT_IEEE802154_CC2520_SPI_DRV_NAME);
+	cc2520->spi = device_get_binding(DT_TI_CC2520_0_BUS_NAME);
 	if (!cc2520->spi) {
 		LOG_ERR("Unable to get SPI device");
 		return -ENODEV;
@@ -993,25 +985,25 @@ static inline int configure_spi(struct device *dev)
 
 #if defined(CONFIG_IEEE802154_CC2520_GPIO_SPI_CS)
 	cs_ctrl.gpio_dev = device_get_binding(
-		DT_IEEE802154_CC2520_GPIO_SPI_CS_DRV_NAME);
+		DT_TI_CC2520_0_CS_GPIO_CONTROLLER);
 	if (!cs_ctrl.gpio_dev) {
 		LOG_ERR("Unable to get GPIO SPI CS device");
 		return -ENODEV;
 	}
 
-	cs_ctrl.gpio_pin = DT_IEEE802154_CC2520_GPIO_SPI_CS_PIN;
+	cs_ctrl.gpio_pin = DT_TI_CC2520_0_CS_GPIO_PIN;
 	cs_ctrl.delay = 0;
 
 	cc2520->spi_cfg.cs = &cs_ctrl;
 
 	LOG_DBG("SPI GPIO CS configured on %s:%u",
-		    DT_IEEE802154_CC2520_GPIO_SPI_CS_DRV_NAME,
-		    DT_IEEE802154_CC2520_GPIO_SPI_CS_PIN);
+		    DT_TI_CC2520_0_CS_GPIO_CONTROLLER,
+		    DT_TI_CC2520_0_CS_GPIO_PIN);
 #endif /* CONFIG_IEEE802154_CC2520_GPIO_SPI_CS */
 
-	cc2520->spi_cfg.frequency = DT_IEEE802154_CC2520_SPI_FREQ;
+	cc2520->spi_cfg.frequency = DT_TI_CC2520_0_SPI_MAX_FREQUENCY;
 	cc2520->spi_cfg.operation = SPI_WORD_SET(8);
-	cc2520->spi_cfg.slave = DT_IEEE802154_CC2520_SPI_SLAVE;
+	cc2520->spi_cfg.slave = DT_TI_CC2520_0_BASE_ADDRESS;
 
 	return 0;
 }

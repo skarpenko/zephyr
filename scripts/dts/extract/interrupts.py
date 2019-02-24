@@ -15,46 +15,39 @@ class DTInterrupts(DTDirective):
     def __init__(self):
         pass
 
-    def _find_parent_irq_node(self, node_address):
+    def _find_parent_irq_node(self, node_path):
         address = ''
 
-        for comp in node_address.split('/')[1:]:
+        for comp in node_path.split('/')[1:]:
             address += '/' + comp
             if 'interrupt-parent' in reduced[address]['props']:
-                interrupt_parent = reduced[address]['props'].get(
-                    'interrupt-parent')
+                interrupt_parent = reduced[address]['props'][
+                    'interrupt-parent']
 
         return phandles[interrupt_parent]
 
     ##
     # @brief Extract interrupts
     #
-    # @param node_address Address of node owning the
-    #                     interrupts definition.
+    # @param node_path Path to node owning the
+    #                  interrupts definition.
     # @param prop compatible property name
     # @param names (unused)
     # @param def_label Define label string of node owning the
     #                  compatible definition.
     #
-    def extract(self, node_address, prop, names, def_label):
-
-        node = reduced[node_address]
+    def extract(self, node_path, prop, names, def_label):
+        node = reduced[node_path]
 
         try:
             props = list(node['props'].get(prop))
         except:
             props = [node['props'].get(prop)]
 
-        irq_parent = self._find_parent_irq_node(node_address)
+        irq_parent = self._find_parent_irq_node(node_path)
 
         l_base = def_label.split('/')
         index = 0
-
-        # Newer versions of dtc might have the interrupt propertly look like
-        # interrupts = <1 2>, <3 4>;
-        # So we need to flatten the list in that case
-        if isinstance(props[0], list):
-            props = [item for sublist in props for item in sublist]
 
         while props:
             prop_def = {}
@@ -62,7 +55,7 @@ class DTInterrupts(DTDirective):
             l_idx = [str(index)]
 
             try:
-                name = [convert_string_to_label(names.pop(0))]
+                name = [str_to_label(names.pop(0))]
             except:
                 name = []
 
@@ -76,21 +69,28 @@ class DTInterrupts(DTDirective):
 
                 l_fqn = '_'.join(l_base + l_cell_prefix + l_idx + l_cell_name)
                 prop_def[l_fqn] = props.pop(0)
+                add_compat_alias(node_path,
+                        '_'.join(l_cell_prefix + l_idx + l_cell_name),
+                        l_fqn, prop_alias)
+
                 if len(name):
                     alias_list = l_base + l_cell_prefix + name + l_cell_name
                     prop_alias['_'.join(alias_list)] = l_fqn
+                    add_compat_alias(node_path,
+                            '_'.join(l_cell_prefix + name + l_cell_name),
+                            l_fqn, prop_alias)
 
-                if node_address in aliases:
+                if node_path in aliases:
                     add_prop_aliases(
-                        node_address,
+                        node_path,
                         lambda alias:
-                            '_'.join([convert_string_to_label(alias)] +
+                            '_'.join([str_to_label(alias)] +
                                      l_cell_prefix + name + l_cell_name),
                         l_fqn,
                         prop_alias)
 
             index += 1
-            insert_defs(node_address, prop_def, prop_alias)
+            insert_defs(node_path, prop_def, prop_alias)
 
 ##
 # @brief Management information for interrupts.

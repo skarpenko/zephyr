@@ -15,7 +15,7 @@
 #define sem_take_from_isr(sema) irq_offload(isr_sem_take, sema)
 
 #define SEM_TIMEOUT (MSEC(100))
-#define STACK_SIZE (1024)
+#define STACK_SIZE (1024 + CONFIG_TEST_EXTRA_STACKSIZE)
 #define TOTAL_THREADS_WAITING (5)
 
 struct timeout_info {
@@ -38,8 +38,8 @@ K_PIPE_DEFINE(timeout_info_pipe,
 	      sizeof(struct timeout_info) * TOTAL_THREADS_WAITING, 4);
 
 
-__kernel struct k_thread sem_tid, sem_tid_1, sem_tid_2;
-__kernel struct k_thread multiple_tid[TOTAL_THREADS_WAITING];
+struct k_thread sem_tid, sem_tid_1, sem_tid_2;
+struct k_thread multiple_tid[TOTAL_THREADS_WAITING];
 
 /******************************************************************************/
 /* Helper functions */

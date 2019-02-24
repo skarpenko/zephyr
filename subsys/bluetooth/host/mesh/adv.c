@@ -45,14 +45,7 @@
 #define ADV_INT_DEFAULT_MS 100
 #define ADV_INT_FAST_MS    20
 
-/* TinyCrypt PRNG consumes a lot of stack space, so we need to have
- * an increased call stack whenever it's used.
- */
-#if defined(CONFIG_BT_HOST_CRYPTO)
 #define ADV_STACK_SIZE 768
-#else
-#define ADV_STACK_SIZE 512
-#endif
 
 static K_FIFO_DEFINE(adv_queue);
 static struct k_thread adv_thread_data;
@@ -103,7 +96,7 @@ static inline void adv_send(struct net_buf *buf)
 	struct bt_data ad;
 	int err;
 
-	adv_int = max(adv_int_min,
+	adv_int = MAX(adv_int_min,
 		      BT_MESH_TRANSMIT_INT(BT_MESH_ADV(buf)->xmit));
 	duration = (MESH_SCAN_WINDOW_MS +
 		    ((BT_MESH_TRANSMIT_COUNT(BT_MESH_ADV(buf)->xmit) + 1) *
@@ -214,6 +207,11 @@ struct net_buf *bt_mesh_adv_create_from_pool(struct net_buf_pool *pool,
 	struct bt_mesh_adv *adv;
 	struct net_buf *buf;
 
+	if (atomic_test_bit(bt_mesh.flags, BT_MESH_SUSPENDED)) {
+		BT_WARN("Refusing to allocate buffer while suspended");
+		return NULL;
+	}
+
 	buf = net_buf_alloc(pool, timeout);
 	if (!buf) {
 		return NULL;
@@ -306,6 +304,7 @@ void bt_mesh_adv_init(void)
 	k_thread_create(&adv_thread_data, adv_thread_stack,
 			K_THREAD_STACK_SIZEOF(adv_thread_stack), adv_thread,
 			NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
+	k_thread_name_set(&adv_thread_data, "BT Mesh adv");
 }
 
 int bt_mesh_scan_enable(void)

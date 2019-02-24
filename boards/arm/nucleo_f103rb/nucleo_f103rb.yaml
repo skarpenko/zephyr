@@ -7,5 +7,9 @@ toolchain:
   - gnuarmemb
   - xtools
 ram: 20
+flash: 128
 supported:
+  - gpio
+  - spi
   - pwm
+  - watchdog

@@ -8,3 +8,9 @@ toolchain:
   - xtools
 ram: 20
 flash: 192
+supported:
+  - arduino_i2c
+  - gpio
+  - i2c
+  - spi
+  - watchdog

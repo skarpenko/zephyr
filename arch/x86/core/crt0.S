@@ -38,7 +38,7 @@
 	GDATA(__start_time_stamp)
 #endif
 
-#ifdef CONFIG_SYS_POWER_DEEP_SLEEP
+#ifdef CONFIG_SYS_POWER_DEEP_SLEEP_STATES
 	GTEXT(sys_resume_from_deep_sleep)
 #endif
 
@@ -284,7 +284,7 @@ __csSet:
 #else
 	addl	$CONFIG_ISR_STACK_SIZE, %esp
 #endif
-#if defined(CONFIG_SYS_POWER_DEEP_SLEEP) && \
+#if defined(CONFIG_SYS_POWER_DEEP_SLEEP_STATES) && \
              !defined(CONFIG_BOOTLOADER_CONTEXT_RESTORE)
 	/*
 	 * Invoke sys_resume_from_deep_sleep() hook to handle resume from
@@ -314,13 +314,13 @@ __csSet:
 
 	call	_x86_data_copy
 
-#ifdef CONFIG_APPLICATION_MEMORY
-	movl	$__app_data_ram_start, %edi /* DATA in RAM (dest) */
-	movl	$__app_data_rom_start, %esi /* DATA in ROM (src) */
-	movl	$__app_data_num_words, %ecx /* Size of DATA in quad bytes */
+#ifdef CONFIG_USERSPACE
+	movl	$_app_smem_start, %edi /* DATA in RAM (dest) */
+	movl	$_app_smem_rom_start, %esi /* DATA in ROM (src) */
+	movl	$_app_smem_num_words, %ecx /* Size of DATA in quad bytes */
 
 	call	_x86_data_copy
-#endif /* CONFIG_APPLICATION_MEMORY */
+#endif /* CONFIG_USERSPACE */
 
 #endif /* CONFIG_XIP */
 
@@ -334,11 +334,11 @@ __csSet:
 	movl	$__bss_num_words, %ecx	/* number of quad bytes in .bss */
 	call	_x86_bss_zero
 
-#ifdef CONFIG_APPLICATION_MEMORY
-	movl	$__app_bss_start, %edi		/* load app BSS start address */
-	movl	$__app_bss_num_words, %ecx	/* number of quad bytes */
+#ifdef CONFIG_COVERAGE_GCOV
+	movl	$__gcov_bss_start, %edi	/* load gcov BSS start address */
+	movl	$__gcov_bss_num_words, %ecx	/* number of quad bytes */
 	call	_x86_bss_zero
-#endif
+#endif /* CONFIG_COVERAGE_GCOV */
 
 #ifdef CONFIG_GDT_DYNAMIC
 	/* activate RAM-based Global Descriptor Table (GDT) */
@@ -348,15 +348,10 @@ __csSet:
 #ifdef CONFIG_X86_MMU
 
 	/* load the page directory address into the registers*/
-	movl $__mmu_tables_start, %eax
+	movl $z_x86_kernel_pdpt, %eax
 	movl %eax, %cr3
 
-#ifndef CONFIG_X86_PAE_MODE
-	/*Set CR4.PAE = 0 (5th bit in CR4*/
-	movl %cr4, %eax
-	andl $CR4_PAE_DISABLE, %eax
-	movl %eax, %cr4
-#else
+	/* Enable PAE */
 	movl %cr4, %eax
 	orl $CR4_PAE_ENABLE, %eax
 	movl %eax, %cr4
@@ -366,7 +361,7 @@ __csSet:
 	rdmsr
 	orl $0x800, %eax
 	wrmsr
-#endif
+
 	/* Enable paging (CR0.PG, bit 31) / write protect (CR0.WP, bit 16) */
 	movl %cr0, %eax
 	orl $CR0_PG_WP_ENABLE, %eax

@@ -53,7 +53,7 @@ struct usb_cdc_ecm_config {
 	struct usb_ep_descriptor if1_1_out_ep;
 } __packed;
 
-USBD_CLASS_DESCR_DEFINE(primary) struct usb_cdc_ecm_config cdc_ecm_cfg = {
+USBD_CLASS_DESCR_DEFINE(primary, 0) struct usb_cdc_ecm_config cdc_ecm_cfg = {
 #ifdef CONFIG_USB_COMPOSITE_DEVICE
 	.iad = {
 		.bLength = sizeof(struct usb_association_descriptor),
@@ -101,7 +101,7 @@ USBD_CLASS_DESCR_DEFINE(primary) struct usb_cdc_ecm_config cdc_ecm_cfg = {
 		.bDescriptorSubtype = ETHERNET_FUNC_DESC,
 		.iMACAddress = 4,
 		.bmEthernetStatistics = sys_cpu_to_le32(0), /* None */
-		.wMaxSegmentSize = sys_cpu_to_le16(1514),
+		.wMaxSegmentSize = sys_cpu_to_le16(NETUSB_MTU),
 		.wNumberMCFilters = sys_cpu_to_le16(0), /* None */
 		.bNumberPowerFilters = 0, /* No wake up */
 	},
@@ -259,7 +259,7 @@ static int ecm_send(struct net_pkt *pkt)
 	struct net_buf *frag;
 	int b_idx = 0, ret;
 
-	net_hexdump_frags("<", pkt, false);
+	net_pkt_hexdump(pkt, "<");
 
 	if (!pkt->frags) {
 		return -ENODATA;
@@ -361,7 +361,7 @@ static inline void ecm_status_interface(const u8_t *iface)
 	netusb_enable(&ecm_function);
 }
 
-static void ecm_status_cb(enum usb_dc_status_code status, const u8_t *param)
+static void ecm_do_cb(enum usb_dc_status_code status, const u8_t *param)
 {
 	/* Check the USB status and do needed action if required */
 	switch (status) {
@@ -394,6 +394,21 @@ static void ecm_status_cb(enum usb_dc_status_code status, const u8_t *param)
 	}
 }
 
+#ifdef CONFIG_USB_COMPOSITE_DEVICE
+static void ecm_status_composite_cb(struct usb_cfg_data *cfg,
+				    enum usb_dc_status_code status,
+				    const u8_t *param)
+{
+	ARG_UNUSED(cfg);
+	ecm_do_cb(status, param);
+}
+#else
+static void ecm_status_cb(enum usb_dc_status_code status, const u8_t *param)
+{
+	ecm_do_cb(status, param);
+}
+#endif
+
 struct usb_cdc_ecm_mac_descr {
 	u8_t bLength;
 	u8_t bDescriptorType;
@@ -407,9 +422,12 @@ USBD_STRING_DESCR_DEFINE(primary) struct usb_cdc_ecm_mac_descr utf16le_mac = {
 	.bString = CONFIG_USB_DEVICE_NETWORK_ECM_MAC
 };
 
-static void ecm_interface_config(u8_t bInterfaceNumber)
+static void ecm_interface_config(struct usb_desc_header *head,
+				 u8_t bInterfaceNumber)
 {
 	int idx = usb_get_str_descriptor_idx(&utf16le_mac);
+
+	ARG_UNUSED(head);
 
 	if (idx) {
 		LOG_DBG("fixup string %d", idx);
@@ -430,7 +448,11 @@ USBD_CFG_DATA_DEFINE(netusb) struct usb_cfg_data netusb_config = {
 	.usb_device_description = NULL,
 	.interface_config = ecm_interface_config,
 	.interface_descriptor = &cdc_ecm_cfg.if0,
+#ifdef CONFIG_USB_COMPOSITE_DEVICE
+	.cb_usb_status_composite = ecm_status_composite_cb,
+#else
 	.cb_usb_status = ecm_status_cb,
+#endif
 	.interface = {
 		.class_handler = ecm_class_handler,
 		.custom_handler = NULL,

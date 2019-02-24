@@ -115,15 +115,18 @@ do {                                                                    \
 
 #define __in_section_unique(seg) ___in_section(seg, __FILE__, __COUNTER__)
 
-#ifdef CONFIG_APPLICATION_MEMORY
-#define __kernel	__in_section_unique(kernel)
-#define __kernel_noinit	__in_section_unique(kernel_noinit)
-#define __kernel_bss	__in_section_unique(kernel_bss)
-#else
-#define __kernel
-#define __kernel_noinit	__noinit
-#define __kernel_bss
-#endif
+/* When using XIP, using '__ramfunc' places a function into RAM instead
+ * of FLASH. Make sure '__ramfunc' is defined only when
+ * CONFIG_ARCH_HAS_RAMFUNC_SUPPORT is defined, so that the compiler can
+ * report an error if '__ramfunc' is used but the architecture does not
+ * support it.
+ */
+#if !defined(CONFIG_XIP)
+#define __ramfunc
+#elif defined(CONFIG_ARCH_HAS_RAMFUNC_SUPPORT)
+#define __ramfunc	__attribute__((noinline))			\
+			__attribute__((long_call, section(".ramfunc")))
+#endif /* !CONFIG_XIP */
 
 #ifndef __packed
 #define __packed        __attribute__((__packed__))

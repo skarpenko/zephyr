@@ -7,4 +7,11 @@ toolchain:
   - gnuarmemb
   - xtools
 supported:
+  - arduino_i2c
   - rtc
+  - counter
+  - gpio
+  - spi
+  - i2c
+ram: 96
+flash: 512

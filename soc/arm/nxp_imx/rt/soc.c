@@ -40,11 +40,21 @@ const clock_usb_pll_config_t usb1PllConfig = {
 const clock_enet_pll_config_t ethPllConfig = {
 #ifdef CONFIG_SOC_MIMXRT1021
 	.enableClkOutput500M = true,
-#else
+#endif
+#ifdef CONFIG_ETH_MCUX
 	.enableClkOutput = true,
 #endif
 	.enableClkOutput25M = false,
 	.loopDivider = 1,
+};
+#endif
+
+#ifdef CONFIG_INIT_VIDEO_PLL
+const clock_video_pll_config_t videoPllConfig = {
+	.loopDivider = 31,
+	.postDivider = 8,
+	.numerator = 0,
+	.denominator = 0,
 };
 #endif
 
@@ -114,6 +124,9 @@ static ALWAYS_INLINE void clkInit(void)
 #ifdef CONFIG_INIT_ENET_PLL
 	CLOCK_InitEnetPll(&ethPllConfig);
 #endif
+#ifdef CONFIG_INIT_VIDEO_PLL
+	CLOCK_InitVideoPll(&videoPllConfig);
+#endif
 
 	CLOCK_SetDiv(kCLOCK_ArmDiv, CONFIG_ARM_DIV); /* Set ARM PODF */
 	CLOCK_SetDiv(kCLOCK_AhbDiv, CONFIG_AHB_DIV); /* Set AHB PODF */
@@ -131,9 +144,20 @@ static ALWAYS_INLINE void clkInit(void)
 	CLOCK_SetDiv(kCLOCK_UartDiv, 0); /* Set UART divider to 1 */
 #endif
 
+#ifdef CONFIG_I2C_MCUX_LPI2C
+	CLOCK_SetMux(kCLOCK_Lpi2cMux, 0); /* Set I2C source as USB1 PLL 480M */
+	CLOCK_SetDiv(kCLOCK_Lpi2cDiv, 5); /* Set I2C divider to 6 */
+#endif
+
 #ifdef CONFIG_SPI_MCUX_LPSPI
 	CLOCK_SetMux(kCLOCK_LpspiMux, 1); /* Set SPI source to USB1 PFD0 720M */
 	CLOCK_SetDiv(kCLOCK_LpspiDiv, 7); /* Set SPI divider to 8 */
+#endif
+
+#ifdef CONFIG_DISPLAY_MCUX_ELCDIF
+	CLOCK_SetMux(kCLOCK_LcdifPreMux, 2);
+	CLOCK_SetDiv(kCLOCK_LcdifPreDiv, 4);
+	CLOCK_SetDiv(kCLOCK_LcdifDiv, 1);
 #endif
 
 	/* Keep the system clock running so SYSTICK can wake up the system from

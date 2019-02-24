@@ -120,7 +120,8 @@ static int read_handler(void *ctx, off_t off, char *buf, size_t *len)
 	struct fcb_entry_ctx *entry_ctx = ctx;
 
 	if (off >= entry_ctx->loc.fe_data_len) {
-		return -EINVAL;
+		*len = 0;
+		return 0;
 	}
 
 	if ((off + *len) > entry_ctx->loc.fe_data_len) {
@@ -248,10 +249,10 @@ static int settings_fcb_save(struct settings_store *cs, const char *name,
 		return -EINVAL;
 	}
 
-	wbs = flash_area_align(cf->cf_fcb.fap);
+	wbs = cf->cf_fcb.f_align;
 	len = settings_line_len_calc(name, val_len);
 
-	for (i = 0; i < CONFIG_SETTINGS_FCB_NUM_AREAS; i++) {
+	for (i = 0; i < cf->cf_fcb.f_sector_cnt - 1; i++) {
 		rc = fcb_append(&cf->cf_fcb, len, &loc.loc);
 		if (rc != FCB_ERR_NOSPACE) {
 			break;

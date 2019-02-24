@@ -285,8 +285,8 @@ char *log_strdup(const char *str);
 #else
 #define _LOG_LEVEL_RESOLVE(...) \
 	_LOG_EVAL(LOG_LEVEL, \
-		  (__LOG_ARG_2(__VA_ARGS__, LOG_LEVEL)), \
-		  (__LOG_ARG_2(__VA_ARGS__, CONFIG_LOG_DEFAULT_LEVEL)))
+		  (GET_ARG2(__VA_ARGS__, LOG_LEVEL)), \
+		  (GET_ARG2(__VA_ARGS__, CONFIG_LOG_DEFAULT_LEVEL)))
 #endif
 
 /* Return first argument */
@@ -346,7 +346,7 @@ char *log_strdup(const char *str);
  *
  * @note The module's state is defined, and the module is registered,
  *       only if LOG_LEVEL for the current source file is non-zero or
- *       it is not defined and CONFIG_LOG_DEFAULT_LOG_LEVEL is non-zero.
+ *       it is not defined and CONFIG_LOG_DEFAULT_LEVEL is non-zero.
  *       In other cases, this macro has no effect.
  * @see LOG_MODULE_DECLARE
  */
@@ -355,7 +355,7 @@ char *log_strdup(const char *str);
 #define LOG_MODULE_REGISTER(...)					\
 	_LOG_EVAL(							\
 		_LOG_LEVEL_RESOLVE(__VA_ARGS__),			\
-		(_LOG_MODULE_DATA_CREATE(_LOG_ARG1(__VA_ARGS__),	\
+		(_LOG_MODULE_DATA_CREATE(GET_ARG1(__VA_ARGS__),		\
 				      _LOG_LEVEL_RESOLVE(__VA_ARGS__))),\
 		()/*Empty*/						\
 	)								\
@@ -383,26 +383,26 @@ char *log_strdup(const char *str);
  *
  * @note The module's state is declared only if LOG_LEVEL for the
  *       current source file is non-zero or it is not defined and
- *       CONFIG_LOG_DEFAULT_LOG_LEVEL is non-zero.  In other cases,
+ *       CONFIG_LOG_DEFAULT_LEVEL is non-zero.  In other cases,
  *       this macro has no effect.
  * @see LOG_MODULE_REGISTER
  */
 #define LOG_MODULE_DECLARE(...)						      \
 	extern const struct log_source_const_data			      \
-			LOG_ITEM_CONST_DATA(_LOG_ARG1(__VA_ARGS__));	      \
+			LOG_ITEM_CONST_DATA(GET_ARG1(__VA_ARGS__));	      \
 	extern struct log_source_dynamic_data				      \
-			LOG_ITEM_DYNAMIC_DATA(_LOG_ARG1(__VA_ARGS__));	      \
+			LOG_ITEM_DYNAMIC_DATA(GET_ARG1(__VA_ARGS__));	      \
 									      \
 	static const struct log_source_const_data *			      \
 		__log_current_const_data __attribute__((unused)) =	      \
 			_LOG_LEVEL_RESOLVE(__VA_ARGS__) ?		      \
-			&LOG_ITEM_CONST_DATA(_LOG_ARG1(__VA_ARGS__)) : NULL;  \
+			&LOG_ITEM_CONST_DATA(GET_ARG1(__VA_ARGS__)) : NULL;   \
 									      \
 	static struct log_source_dynamic_data *				      \
 		__log_current_dynamic_data __attribute__((unused)) =	      \
 			(_LOG_LEVEL_RESOLVE(__VA_ARGS__) &&		      \
 			IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) ?	      \
-			&LOG_ITEM_DYNAMIC_DATA(_LOG_ARG1(__VA_ARGS__)) : NULL;\
+			&LOG_ITEM_DYNAMIC_DATA(GET_ARG1(__VA_ARGS__)) : NULL; \
 									      \
 	static const u32_t __log_level __attribute__((unused)) =	      \
 					_LOG_LEVEL_RESOLVE(__VA_ARGS__)

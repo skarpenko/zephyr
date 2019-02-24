@@ -32,6 +32,7 @@
 
 #include "bt.h"
 #include "ll.h"
+#include "hci.h"
 
 #define DEVICE_NAME		CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN		(sizeof(DEVICE_NAME) - 1)
@@ -56,7 +57,7 @@ static bool data_cb(struct bt_data *data, void *user_data)
 	switch (data->type) {
 	case BT_DATA_NAME_SHORTENED:
 	case BT_DATA_NAME_COMPLETE:
-		memcpy(name, data->data, min(data->data_len, NAME_LEN - 1));
+		memcpy(name, data->data, MIN(data->data_len, NAME_LEN - 1));
 		return false;
 	default:
 		return true;
@@ -759,6 +760,7 @@ connect:
 #endif /* CONFIG_BT_PERIPHERAL */
 #endif /* CONFIG_BT_BROADCASTER */
 
+#if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
 static int cmd_connect_le(const struct shell *shell, size_t argc, char *argv[])
 {
@@ -815,7 +817,6 @@ static int cmd_auto_conn(const struct shell *shell, size_t argc, char *argv[])
 }
 #endif /* CONFIG_BT_CENTRAL */
 
-#if defined(CONFIG_BT_CONN)
 static int cmd_disconnect(const struct shell *shell, size_t argc, char *argv[])
 {
 	struct bt_conn *conn;
@@ -1331,7 +1332,7 @@ static int cmd_auth_passkey(const struct shell *shell,
 #define HELP_NONE "[none]"
 #define HELP_ADDR_LE "<address: XX:XX:XX:XX:XX:XX> <type: (public|random)>"
 
-SHELL_CREATE_STATIC_SUBCMD_SET(bt_cmds) {
+SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 	SHELL_CMD_ARG(init, NULL, HELP_ADDR_LE, cmd_init, 1, 0),
 #if defined(CONFIG_BT_HCI)
 	SHELL_CMD_ARG(hci-cmd, NULL, "<ogf> <ocf> [data]", cmd_hci_cmd, 3, 1),
@@ -1391,6 +1392,9 @@ SHELL_CREATE_STATIC_SUBCMD_SET(bt_cmds) {
 #endif
 #endif /* CONFIG_BT_SMP || CONFIG_BT_BREDR) */
 #endif /* CONFIG_BT_CONN */
+#if defined(CONFIG_BT_HCI_MESH_EXT)
+	SHELL_CMD(mesh_adv, NULL, "<on, off>", cmd_mesh_adv),
+#endif /* CONFIG_BT_HCI_MESH_EXT */
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 #if defined(CONFIG_BT_BROADCASTER)
 	SHELL_CMD_ARG(advx, NULL, "<on off> [coded] [anon] [txp]", cmd_advx,
@@ -1411,8 +1415,11 @@ SHELL_CREATE_STATIC_SUBCMD_SET(bt_cmds) {
 		      4, 0),
 	SHELL_CMD_ARG(test_end, NULL, HELP_NONE, cmd_test_end, 1, 0),
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#if defined(CONFIG_BT_LL_SW_SPLIT)
+	SHELL_CMD(ull_reset, NULL, HELP_NONE, cmd_ull_reset),
+#endif /* CONFIG_BT_LL_SW_SPLIT */
 	SHELL_SUBCMD_SET_END
-};
+);
 
 static int cmd_bt(const struct shell *shell, size_t argc, char **argv)
 {

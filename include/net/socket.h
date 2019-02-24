@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2017-2018 Linaro Limited
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -31,14 +31,25 @@
 extern "C" {
 #endif
 
+struct zsock_timeval {
+	/* Using longs, as many (?) implementations seem to use it. */
+	long tv_sec;
+	long tv_usec;
+};
+
 struct zsock_pollfd {
 	int fd;
 	short events;
 	short revents;
 };
 
+typedef struct zsock_fd_set {
+	u32_t bitset[(CONFIG_POSIX_MAX_FDS + 31) / 32];
+} zsock_fd_set;
+
 /* Values are compatible with Linux */
 #define ZSOCK_POLLIN 1
+#define ZSOCK_POLLPRI 2
 #define ZSOCK_POLLOUT 4
 #define ZSOCK_POLLERR 8
 #define ZSOCK_POLLHUP 0x10
@@ -46,6 +57,14 @@ struct zsock_pollfd {
 
 #define ZSOCK_MSG_PEEK 0x02
 #define ZSOCK_MSG_DONTWAIT 0x40
+
+/* Well-known values, e.g. from Linux man 2 shutdown:
+ * "The constants SHUT_RD, SHUT_WR, SHUT_RDWR have the value 0, 1, 2,
+ * respectively". Some software uses numeric values.
+ */
+#define ZSOCK_SHUT_RD 0
+#define ZSOCK_SHUT_WR 1
+#define ZSOCK_SHUT_RDWR 2
 
 /** Protocol level for TLS.
  *  Here, the same socket protocol level for TLS as in Linux was used.
@@ -119,6 +138,8 @@ __syscall int zsock_socket(int family, int type, int proto);
 
 __syscall int zsock_close(int sock);
 
+__syscall int zsock_shutdown(int sock, int how);
+
 __syscall int zsock_bind(int sock, const struct sockaddr *addr,
 			 socklen_t addrlen);
 
@@ -153,11 +174,32 @@ __syscall int zsock_fcntl(int sock, int cmd, int flags);
 
 __syscall int zsock_poll(struct zsock_pollfd *fds, int nfds, int timeout);
 
+/* select() API is inefficient, and implemented as inefficient wrapper on
+ * top of poll(). Avoid select(), use poll directly().
+ */
+int zsock_select(int nfds, zsock_fd_set *readfds, zsock_fd_set *writefds,
+		 zsock_fd_set *exceptfds, struct zsock_timeval *timeout);
+
+#define ZSOCK_FD_SETSIZE (sizeof(((zsock_fd_set *)0)->bitset) * 8)
+
+void ZSOCK_FD_ZERO(zsock_fd_set *set);
+int ZSOCK_FD_ISSET(int fd, zsock_fd_set *set);
+void ZSOCK_FD_CLR(int fd, zsock_fd_set *set);
+void ZSOCK_FD_SET(int fd, zsock_fd_set *set);
+
 int zsock_getsockopt(int sock, int level, int optname,
 		     void *optval, socklen_t *optlen);
 
 int zsock_setsockopt(int sock, int level, int optname,
 		     const void *optval, socklen_t optlen);
+
+int zsock_gethostname(char *buf, size_t len);
+
+static inline char *zsock_inet_ntop(sa_family_t family, const void *src,
+				    char *dst, size_t size)
+{
+	return net_addr_ntop(family, src, dst, size);
+}
 
 __syscall int zsock_inet_pton(sa_family_t family, const char *src, void *dst);
 
@@ -170,8 +212,28 @@ int zsock_getaddrinfo(const char *host, const char *service,
 		      const struct zsock_addrinfo *hints,
 		      struct zsock_addrinfo **res);
 
+static inline void zsock_freeaddrinfo(struct zsock_addrinfo *ai)
+{
+	free(ai);
+}
+
+#define NI_NUMERICHOST 1
+#define NI_NUMERICSERV 2
+#define NI_NOFQDN 4
+#define NI_NAMEREQD 8
+#define NI_DGRAM 16
+
+int zsock_getnameinfo(const struct sockaddr *addr, socklen_t addrlen,
+		      char *host, socklen_t hostlen,
+		      char *serv, socklen_t servlen, int flags);
+
 #if defined(CONFIG_NET_SOCKETS_POSIX_NAMES)
+
 #define pollfd zsock_pollfd
+#define fd_set zsock_fd_set
+#define timeval zsock_timeval
+#define FD_SETSIZE ZSOCK_FD_SETSIZE
+
 #if !defined(CONFIG_NET_SOCKETS_OFFLOAD)
 static inline int socket(int family, int type, int proto)
 {
@@ -181,6 +243,11 @@ static inline int socket(int family, int type, int proto)
 static inline int close(int sock)
 {
 	return zsock_close(sock);
+}
+
+static inline int shutdown(int sock, int how)
+{
+	return zsock_shutdown(sock, how);
 }
 
 static inline int bind(int sock, const struct sockaddr *addr, socklen_t addrlen)
@@ -235,6 +302,33 @@ static inline int poll(struct zsock_pollfd *fds, int nfds, int timeout)
 	return zsock_poll(fds, nfds, timeout);
 }
 
+static inline int select(int nfds, zsock_fd_set *readfds,
+			 zsock_fd_set *writefds, zsock_fd_set *exceptfds,
+			 struct timeval *timeout)
+{
+	return zsock_select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+static inline void FD_ZERO(zsock_fd_set *set)
+{
+	ZSOCK_FD_ZERO(set);
+}
+
+static inline int FD_ISSET(int fd, zsock_fd_set *set)
+{
+	return ZSOCK_FD_ISSET(fd, set);
+}
+
+static inline void FD_CLR(int fd, zsock_fd_set *set)
+{
+	ZSOCK_FD_CLR(fd, set);
+}
+
+static inline void FD_SET(int fd, zsock_fd_set *set)
+{
+	ZSOCK_FD_SET(fd, set);
+}
+
 static inline int getsockopt(int sock, int level, int optname,
 			     void *optval, socklen_t *optlen)
 {
@@ -256,10 +350,28 @@ static inline int getaddrinfo(const char *host, const char *service,
 
 static inline void freeaddrinfo(struct zsock_addrinfo *ai)
 {
-	free(ai);
+	zsock_freeaddrinfo(ai);
+}
+
+static inline int getnameinfo(const struct sockaddr *addr, socklen_t addrlen,
+			      char *host, socklen_t hostlen,
+			      char *serv, socklen_t servlen, int flags)
+{
+	return zsock_getnameinfo(addr, addrlen, host, hostlen,
+				 serv, servlen, flags);
 }
 
 #define addrinfo zsock_addrinfo
+
+static inline int gethostname(char *buf, size_t len)
+{
+	return zsock_gethostname(buf, len);
+}
+
+static inline int inet_pton(sa_family_t family, const char *src, void *dst)
+{
+	return zsock_inet_pton(family, src, dst);
+}
 
 #else
 
@@ -275,6 +387,21 @@ struct addrinfo {
 };
 
 #include <net/socket_offload.h>
+
+static inline int inet_pton(sa_family_t family, const char *src, void *dst)
+{
+	if ((family != AF_INET) && (family != AF_INET6)) {
+		errno = EAFNOSUPPORT;
+		return -1;
+	}
+
+	if (net_addr_pton(family, src, dst) == 0) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 #endif /* !defined(CONFIG_NET_SOCKETS_OFFLOAD) */
 
 #define POLLIN ZSOCK_POLLIN
@@ -286,15 +413,14 @@ struct addrinfo {
 #define MSG_PEEK ZSOCK_MSG_PEEK
 #define MSG_DONTWAIT ZSOCK_MSG_DONTWAIT
 
+#define SHUT_RD ZSOCK_SHUT_RD
+#define SHUT_WR ZSOCK_SHUT_WR
+#define SHUT_RDWR ZSOCK_SHUT_RDWR
+
 static inline char *inet_ntop(sa_family_t family, const void *src, char *dst,
 			      size_t size)
 {
-	return net_addr_ntop(family, src, dst, size);
-}
-
-static inline int inet_pton(sa_family_t family, const char *src, void *dst)
-{
-	return zsock_inet_pton(family, src, dst);
+	return zsock_inet_ntop(family, src, dst, size);
 }
 
 #define EAI_BADFLAGS DNS_EAI_BADFLAGS

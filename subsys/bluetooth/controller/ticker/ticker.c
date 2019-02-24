@@ -29,15 +29,17 @@
 struct ticker_node {
 	u8_t  next;
 
+	/* Imbalance between req and ack indicate ongoing operation */
 	u8_t  req;
 	u8_t  ack;
+
 	u8_t  force;
-	u32_t ticks_periodic;
-	u32_t ticks_to_expire;
+	u32_t ticks_periodic;  /* If non-zero, Interval between expirations */
+	u32_t ticks_to_expire; /* Ticks until expiration */
 	ticker_timeout_func timeout_func;
 	void  *context;
 
-	u32_t ticks_to_expire_minus;
+	u32_t ticks_to_expire_minus; /* Ticks since expiration */
 	u32_t ticks_slot;
 	u16_t lazy_periodic;
 	u16_t lazy_current;
@@ -45,14 +47,13 @@ struct ticker_node {
 	u32_t remainder_current;
 };
 
-enum ticker_user_op_type {
-	TICKER_USER_OP_TYPE_NONE,
-	TICKER_USER_OP_TYPE_IDLE_GET,
-	TICKER_USER_OP_TYPE_SLOT_GET,
-	TICKER_USER_OP_TYPE_START,
-	TICKER_USER_OP_TYPE_UPDATE,
-	TICKER_USER_OP_TYPE_STOP,
-};
+/* possible values for field "op" in struct ticker_user_op */
+#define TICKER_USER_OP_TYPE_NONE     0
+#define TICKER_USER_OP_TYPE_IDLE_GET 1
+#define TICKER_USER_OP_TYPE_SLOT_GET 2
+#define TICKER_USER_OP_TYPE_START    3
+#define TICKER_USER_OP_TYPE_UPDATE   4
+#define TICKER_USER_OP_TYPE_STOP     5
 
 struct ticker_user_op_start {
 	u32_t ticks_at_start;
@@ -81,7 +82,7 @@ struct ticker_user_op_slot_get {
 };
 
 struct ticker_user_op {
-	enum ticker_user_op_type op;
+	u8_t op;
 	u8_t id;
 	union {
 		struct ticker_user_op_start start;
@@ -422,6 +423,12 @@ static void ticks_to_expire_prep(struct ticker_node *ticker,
 
 	/* Calculate ticks to expire for this new node */
 	if (!((ticks_at_start - ticks_current) & BIT(HAL_TICKER_CNTR_MSBIT))) {
+		/* Most significant bit is 0 so ticks_at_start lies ahead
+		 * of ticks_current:
+		 *   ticks_at_start - ticks_current >= 0
+		 *   ticks_at_start >= ticks_current.
+		 * So diff is positive.
+		 */
 		ticks_to_expire += ticker_ticks_diff_get(ticks_at_start,
 							 ticks_current);
 	} else {
@@ -1041,7 +1048,7 @@ static inline void ticker_job_compare_update(struct ticker_instance *instance,
 		ticks_elapsed = ticker_ticks_diff_get(ctr, cc) +
 				HAL_TICKER_CNTR_CMP_OFFSET_MIN +
 				HAL_TICKER_CNTR_SET_LATENCY;
-		cc += max(ticks_elapsed, ticks_to_expire);
+		cc += MAX(ticks_elapsed, ticks_to_expire);
 		cc &= HAL_TICKER_CNTR_MASK;
 
 		instance->trigger_set_cb(cc);
@@ -1163,6 +1170,10 @@ void ticker_job(void *param)
 /*****************************************************************************
  * Public Interface
  ****************************************************************************/
+BUILD_ASSERT(sizeof(struct ticker_node) == TICKER_NODE_T_SIZE);
+BUILD_ASSERT(sizeof(struct ticker_user) == TICKER_USER_T_SIZE);
+BUILD_ASSERT(sizeof(struct ticker_user_op) == TICKER_USER_OP_T_SIZE);
+
 u32_t ticker_init(u8_t instance_index, u8_t count_node, void *node,
 		  u8_t count_user, void *user, u8_t count_op, void *user_op,
 		  ticker_caller_id_get_cb_t caller_id_get_cb,
@@ -1173,10 +1184,7 @@ u32_t ticker_init(u8_t instance_index, u8_t count_node, void *node,
 	struct ticker_user_op *user_op_ = (void *)user_op;
 	struct ticker_user *users;
 
-	if ((sizeof(struct ticker_node) != TICKER_NODE_T_SIZE) ||
-	    (sizeof(struct ticker_user) != TICKER_USER_T_SIZE) ||
-	    (sizeof(struct ticker_user_op) != TICKER_USER_OP_T_SIZE) ||
-	    (instance_index >= TICKER_INSTANCE_MAX)) {
+	if (instance_index >= TICKER_INSTANCE_MAX) {
 		return TICKER_STATUS_FAILURE;
 	}
 

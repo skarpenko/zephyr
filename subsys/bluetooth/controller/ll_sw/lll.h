@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Nordic Semiconductor ASA
+ * Copyright (c) 2018-2019 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -22,9 +22,9 @@
 #endif /* CONFIG_BT_CTLR_XTAL_ADVANCED */
 
 #if defined(CONFIG_BT_BROADCASTER) && defined(CONFIG_BT_ADV_SET)
-#define CONFIG_BT_ADV_MAX (CONFIG_BT_ADV_SET + 1)
+#define BT_CTLR_ADV_MAX (CONFIG_BT_ADV_SET + 1)
 #else
-#define CONFIG_BT_ADV_MAX 1
+#define BT_CTLR_ADV_MAX 1
 #endif
 
 enum {
@@ -38,9 +38,9 @@ enum {
 #if defined(CONFIG_BT_BROADCASTER)
 	TICKER_ID_ADV_STOP,
 	TICKER_ID_ADV_BASE,
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
-	TICKER_ID_ADV_LAST = ((TICKER_ID_ADV_BASE) + (CONFIG_BT_ADV_MAX) - 1),
-#endif /* !CONFIG_BT_CTLR_ADV_EXT */
+#if defined(CONFIG_BT_CTLR_ADV_EXT) || defined(CONFIG_BT_HCI_MESH_EXT)
+	TICKER_ID_ADV_LAST = ((TICKER_ID_ADV_BASE) + (BT_CTLR_ADV_MAX) - 1),
+#endif /* !CONFIG_BT_CTLR_ADV_EXT || !CONFIG_BT_HCI_MESH_EXT */
 #endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_OBSERVER)
@@ -58,7 +58,8 @@ enum {
 	TICKER_ID_MAX,
 };
 
-#if defined(CONFIG_BT_BROADCASTER) && !defined(CONFIG_BT_CTLR_ADV_EXT)
+#if defined(CONFIG_BT_BROADCASTER) && !defined(CONFIG_BT_CTLR_ADV_EXT) && \
+	!defined(CONFIG_BT_HCI_MESH_EXT)
 #define TICKER_ID_ADV_LAST TICKER_ID_ADV_BASE
 #endif
 
@@ -78,7 +79,7 @@ struct evt_hdr {
 };
 
 struct ull_hdr {
-	u8_t ref;
+	u8_t ref; /* Number of ongoing (between Prepare and Done) events */
 	void (*disabled_cb)(void *param);
 	void *disabled_param;
 };
@@ -107,17 +108,22 @@ struct lll_event {
 	lll_is_abort_cb_t        is_abort_cb;
 	lll_abort_cb_t           abort_cb;
 	int                      prio;
-	u8_t			 is_resume:1;
-	u8_t			 is_aborted:1;
+	u8_t                     is_resume:1;
+	u8_t                     is_aborted:1;
 };
 
 enum node_rx_type {
+	/* Unused */
 	NODE_RX_TYPE_NONE = 0x00,
+	/* Signals completion of RX event */
 	NODE_RX_TYPE_EVENT_DONE = 0x01,
+	/* Signals arrival of RX Data Channel payload */
 	NODE_RX_TYPE_DC_PDU = 0x02,
+	/* Signals release of RX Data Channel payload */
 	NODE_RX_TYPE_DC_PDU_RELEASE = 0x03,
 
 #if defined(CONFIG_BT_OBSERVER)
+	/* Advertisement report from scanning */
 	NODE_RX_TYPE_REPORT = 0x04,
 #endif /* CONFIG_BT_OBSERVER */
 
@@ -162,8 +168,14 @@ enum node_rx_type {
 #if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 	NODE_RX_TYPE_SCAN_INDICATION = 0x12,
 #endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
+
+#if defined(CONFIG_BT_HCI_MESH_EXT)
+	NODE_RX_TYPE_MESH_ADV_CPLT = 0x13,
+	NODE_RX_TYPE_MESH_REPORT = 0x14,
+#endif /* CONFIG_BT_HCI_MESH_EXT */
 };
 
+/* Header of node_rx_pdu */
 struct node_rx_hdr {
 	union {
 		void        *next;
@@ -175,6 +187,9 @@ struct node_rx_hdr {
 	u16_t               handle;
 };
 
+/* Footer of node_rx_pdu.
+ * TODO: Eliminate footer (move contents to header) to avoid pointer arithmetic
+ */
 struct node_rx_ftr {
 	void  *param;
 	void  *extra;
@@ -186,6 +201,10 @@ struct node_rx_ftr {
 struct node_rx_pdu {
 	struct node_rx_hdr hdr;
 	u8_t               pdu[0];
+	/*
+	 * Footer follows here, but can not be part of this struct due to
+	 * flexible pdu member. Footer obtained by pointer arithmetic
+	 */
 };
 
 enum {

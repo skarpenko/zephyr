@@ -17,7 +17,7 @@
 #include "ss_power_states.h"
 #include "vreg.h"
 
-#if (defined(CONFIG_SYS_POWER_DEEP_SLEEP))
+#if (defined(CONFIG_SYS_POWER_DEEP_SLEEP_STATES))
 extern void _power_soc_sleep(void);
 extern void _power_soc_deep_sleep(void);
 extern void _power_soc_lpss_mode(void);
@@ -27,10 +27,10 @@ static void _deep_sleep(enum power_states state)
 	qm_power_soc_set_ss_restore_flag();
 
 	switch (state) {
-	case SYS_POWER_STATE_DEEP_SLEEP_1:
+	case SYS_POWER_STATE_DEEP_SLEEP_2:
 		_power_soc_sleep();
 		break;
-	case SYS_POWER_STATE_DEEP_SLEEP_2:
+	case SYS_POWER_STATE_DEEP_SLEEP_3:
 		_power_soc_deep_sleep();
 		break;
 	default:
@@ -42,20 +42,22 @@ static void _deep_sleep(enum power_states state)
 void sys_set_power_state(enum power_states state)
 {
 	switch (state) {
-	case SYS_POWER_STATE_CPU_LPS:
+#if (defined(CONFIG_SYS_POWER_LOW_POWER_STATES))
+	case SYS_POWER_STATE_CPU_LPS_1:
 		qm_ss_power_cpu_ss1(QM_SS_POWER_CPU_SS1_TIMER_ON);
 		break;
-	case SYS_POWER_STATE_CPU_LPS_1:
+	case SYS_POWER_STATE_CPU_LPS_2:
 		qm_ss_power_cpu_ss2();
 		break;
-#if (defined(CONFIG_SYS_POWER_DEEP_SLEEP))
-	case SYS_POWER_STATE_DEEP_SLEEP:
+#endif
+#if (defined(CONFIG_SYS_POWER_DEEP_SLEEP_STATES))
+	case SYS_POWER_STATE_DEEP_SLEEP_1:
 		qm_ss_power_soc_lpss_enable();
 		qm_power_soc_set_ss_restore_flag();
 		_power_soc_lpss_mode();
 		break;
-	case SYS_POWER_STATE_DEEP_SLEEP_1:
 	case SYS_POWER_STATE_DEEP_SLEEP_2:
+	case SYS_POWER_STATE_DEEP_SLEEP_3:
 		_deep_sleep(state);
 		break;
 #endif
@@ -66,17 +68,20 @@ void sys_set_power_state(enum power_states state)
 
 void sys_power_state_post_ops(enum power_states state)
 {
-	u32_t limit;
-
 	switch (state) {
+#if (defined(CONFIG_SYS_POWER_LOW_POWER_STATES))
+	case SYS_POWER_STATE_CPU_LPS_2:
+		{
+			/* Expire the timer as it is disabled in SS2. */
+			u32_t limit = _arc_v2_aux_reg_read(_ARC_V2_TMR0_LIMIT);
+			_arc_v2_aux_reg_write(_ARC_V2_TMR0_COUNT, limit - 1);
+		}
 	case SYS_POWER_STATE_CPU_LPS_1:
-		/* Expire the timer as it is disabled in SS2. */
-		limit = _arc_v2_aux_reg_read(_ARC_V2_TMR0_LIMIT);
-		_arc_v2_aux_reg_write(_ARC_V2_TMR0_COUNT, limit - 1);
-	case SYS_POWER_STATE_CPU_LPS:
 		__builtin_arc_seti(0);
 		break;
-	case SYS_POWER_STATE_DEEP_SLEEP:
+#endif
+#if (defined(CONFIG_SYS_POWER_DEEP_SLEEP_STATES))
+	case SYS_POWER_STATE_DEEP_SLEEP_1:
 		qm_ss_power_soc_lpss_disable();
 
 		/* If flag is cleared it means the system entered in
@@ -92,13 +97,13 @@ void sys_power_state_post_ops(enum power_states state)
 			QM_SCSS_GP->gps0 &= ~QM_GPS0_BIT_SENSOR_WAKEUP;
 		}
 		break;
-	case SYS_POWER_STATE_DEEP_SLEEP_1:
 	case SYS_POWER_STATE_DEEP_SLEEP_2:
+	case SYS_POWER_STATE_DEEP_SLEEP_3:
 		/* Route RTC interrupt to the current core */
 		QM_IR_UNMASK_INTERRUPTS(QM_INTERRUPT_ROUTER->rtc_0_int_mask);
 		__builtin_arc_seti(0);
 		break;
-		break;
+#endif
 	default:
 		break;
 	}
