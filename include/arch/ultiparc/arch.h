@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+ * Copyright (c) 2018-2019 Stepan Karpenko <stepan.karpenko@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,8 +11,8 @@
  * included by the generic kernel interface header (include/arch/cpu.h)
  */
 
-#ifndef _ARCH_IFACE_H
-#define _ARCH_IFACE_H
+#ifndef ZEPHYR_INCLUDE_ARCH_ULTIPARC_ARCH_H_
+#define ZEPHYR_INCLUDE_ARCH_ULTIPARC_ARCH_H_
 
 #include <arch/ultiparc/asm_inline.h>
 
@@ -119,6 +119,14 @@ static ALWAYS_INLINE void _arch_irq_unlock(unsigned int key)
 	);
 }
 
+/**
+ * @brief Explicitly nop operation.
+ */
+static ALWAYS_INLINE void arch_nop(void)
+{
+	__asm__ __volatile__("nop;");
+}
+
 
 struct __esf {
 	u32_t vec;	/* Vector number */
@@ -183,4 +191,4 @@ enum ultiparc_exception_cause {
 # include "rtl/ultiparc_rtl.h"
 #endif
 
-#endif /* _ARCH_IFACE_H */
+#endif /* ZEPHYR_INCLUDE_ARCH_ULTIPARC_ARCH_H_ */
