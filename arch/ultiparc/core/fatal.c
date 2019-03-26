@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+ * Copyright (c) 2018-2019 Stepan Karpenko <stepan.karpenko@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -119,7 +119,7 @@ FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 		"Faulting instruction: 0x%08x\n"
 		"   at: 0x%08x     v0: 0x%08x     v1: 0x%08x     a0: 0x%08x\n"
 		"   a1: 0x%08x     a2: 0x%08x     a3: 0x%08x     t0: 0x%08x\n"
-		"   t1: 0x%08x     t2: 0x%08x     t3: 0x%08x     t7: 0x%08x\n"
+		"   t1: 0x%08x     t2: 0x%08x     t3: 0x%08x     t4: 0x%08x\n"
 		"   t5: 0x%08x     t6: 0x%08x     t7: 0x%08x     t8: 0x%08x\n"
 		"   t9: 0x%08x     ra: 0x%08x     hi: 0x%08x     lo: 0x%08x\n"
 		"  epc: 0x%08x  cause: 0x%08x     sr: 0x%08x    psr: 0x%08x\n",
