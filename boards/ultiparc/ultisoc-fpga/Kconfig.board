@@ -1,0 +1,3 @@
+config BOARD_ULTISOC_FPGA
+	bool "UltiSoC FPGA target"
+	depends on SOC_ULTISOC

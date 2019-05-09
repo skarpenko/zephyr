@@ -168,9 +168,9 @@ config XTENSA_TIMER_ID
 	  priority maskable interrupt.
 
 config ULTIPARC_TIMER
-	bool "Ultiparc SoC timer"
+	bool "Ultiparc timer"
 	default n
-	depends on SOC_ULTIPARC_RTL
+	depends on ULTIPARC
 	help
 	  This module implements a kernel device driver for the Ultiparc machine
 	  timer driver. It provides the standard "system clock driver" interfaces.
@@ -178,8 +178,16 @@ config ULTIPARC_TIMER
 config ULTIPARC_TIMER_BASE_ADDRESS
 	hex "Ultiparc timer base address"
 	default 0x80300000
+	depends on ULTIPARC_TIMER
 	help
 	  This options specifies the base I/O address of the Ultiparc Interval Timer.
+
+config ULTIPARC_TIMER_IRQ
+	int "Ultiparc timer IRQ"
+	default 0
+	depends on ULTIPARC_TIMER
+	help
+	  This options specifies the IRQ number of the Ultiparc Interval Timer.
 
 config SAM0_RTC_TIMER
 	bool "Atmel SAM0 series RTC timer"

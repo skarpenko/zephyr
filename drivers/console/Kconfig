@@ -256,6 +256,15 @@ config ULTIPARC_CONSOLE
 	help
 	  Use Ultiparc console to print messages.
 
+config ULTISOC_CONSOLE
+	bool
+	prompt "Use UltiSoC console for output"
+	depends on SOC_ULTISOC
+	select CONSOLE_HAS_DRIVER
+	default y
+	help
+	  Use UltiSoC console to print messages.
+
 config NATIVE_POSIX_CONSOLE
 	bool "Use the host terminal for console"
 	depends on ARCH_POSIX
@@ -311,10 +320,33 @@ config ULTIPARC_CONSOLE_BASE_ADDRESS
 	hex
 	prompt "Ultiparc console base address"
 	default 0x80000000
-	depends on SOC_ULTIPARC_RTL
 	depends on ULTIPARC_CONSOLE
 	help
 	  Base I/O address for Ultiparc Micro UART.
+
+config ULTISOC_CONSOLE_INIT_PRIORITY
+	int
+	prompt "UltiSoC console init priority"
+	default 60
+	depends on ULTISOC_CONSOLE
+	help
+	  Device driver initialization priority.
+
+config ULTISOC_CONSOLE_BASE_ADDRESS
+	hex
+	prompt "UltiSoC console base address"
+	default 0x80000000
+	depends on ULTISOC_CONSOLE
+	help
+	  Base I/O address for UltiSoC UP-UART.
+
+config ULTISOC_CONSOLE_BAUD_RATE
+	int
+	prompt "UltiSoC UP-UART baud rate"
+	default 115200
+	depends on ULTISOC_CONSOLE
+	help
+	  Baud rate configuration for UltiSoC UP-UART.
 
 config NATIVE_POSIX_CONSOLE_INIT_PRIORITY
 	int "Init priority"

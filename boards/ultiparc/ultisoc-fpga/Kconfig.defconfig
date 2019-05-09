@@ -1,0 +1,9 @@
+if BOARD_ULTISOC_FPGA
+
+config BUILD_OUTPUT_BIN
+        default y
+
+config BOARD
+	default "ultisoc-fpga"
+
+endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stepan Karpenko <stepan.karpenko@gmail.com>
+ * Copyright (c) 2018-2019 Stepan Karpenko <stepan.karpenko@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,6 +14,9 @@
 #include <system_timer.h>
 #include <soc.h>
 
+
+/* Timer IRQ number */
+#define TIMER_IRQ		(CONFIG_ULTIPARC_TIMER_IRQ)
 
 /* Timer registers */
 #define TIMER_CTRL_REG		(CONFIG_ULTIPARC_TIMER_BASE_ADDRESS + 0x00)
@@ -49,9 +52,8 @@ int z_clock_driver_init(struct device *device)
 	ARG_UNUSED(device);
 
 	/* Setup timer ISR */
-	IRQ_CONNECT(ULTIPARC_RTL_TIMER_IRQ, 0,
-			ultiparc_timer_irq_handler, NULL, 0);
-	irq_enable(ULTIPARC_RTL_TIMER_IRQ);
+	IRQ_CONNECT(TIMER_IRQ, 0, ultiparc_timer_irq_handler, NULL, 0);
+	irq_enable(TIMER_IRQ);
 
 
 	/*

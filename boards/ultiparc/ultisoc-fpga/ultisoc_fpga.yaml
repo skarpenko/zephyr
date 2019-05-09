@@ -1,0 +1,12 @@
+identifier: ultisoc-fpga
+name: UltiSoC FPGA
+type: fpga
+simulation:
+arch: ultiparc
+toolchain:
+  - zephyr
+testing:
+  default: true
+  ignore_tags:
+    - net
+    - bluetooth

@@ -191,4 +191,8 @@ enum ultiparc_exception_cause {
 # include "rtl/ultiparc_rtl.h"
 #endif
 
+#if defined(CONFIG_SOC_ULTISOC)
+# include "soc/ultisoc.h"
+#endif
+
 #endif /* ZEPHYR_INCLUDE_ARCH_ULTIPARC_ARCH_H_ */
