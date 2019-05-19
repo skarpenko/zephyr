@@ -1,0 +1,58 @@
+# Kconfig.ultisoc - UltiSoC UART configuration options
+#
+# Copyright (c) 2019 Stepan Karpenko <stepan.karpenko@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+menuconfig UART_ULTISOC
+	bool "UltiSoC serial driver"
+	depends on SOC_ULTISOC
+	select SERIAL_HAS_DRIVER
+	select SERIAL_SUPPORT_INTERRUPT
+	help
+	  This option enables the UltiSoC serial driver.
+
+# ---------- Port 0 ----------
+
+menuconfig UART_ULTISOC_PORT_0
+	bool "Enable UltiSoC UART port 0"
+	depends on UART_ULTISOC
+	help
+	  This tells the driver to configure the UART port at boot, depending on
+	  the additional configure options below.
+
+config UART_ULTISOC_PORT_0_BASE_ADDRESS
+	hex "Port 0 MMIO base"
+	default 0x80000000
+	depends on UART_ULTISOC_PORT_0
+	help
+	  Port 0 MMIO base address
+
+config UART_ULTISOC_PORT_0_IRQ
+	int "Port 0 IRQ"
+	default 1
+	depends on UART_ULTISOC_PORT_0
+	help
+	  Port 0 IRQ number
+
+config UART_ULTISOC_PORT_0_IRQ_PRIORITY
+	int "Port 0 interrupt priority"
+	default 1
+	depends on UART_ULTISOC_PORT_0
+	help
+	  Port 0 interrupt priority
+
+config UART_ULTISOC_PORT_0_BAUD_RATE
+	int "Port 0 baud rate"
+	default 115200
+	depends on UART_ULTISOC_PORT_0
+	help
+	  Port 0 baud rate
+
+config UART_ULTISOC_PORT_0_CLK_FREQ
+	int "Port 0 clock frequency"
+	default 50000000
+	depends on UART_ULTISOC_PORT_0
+	help
+	  Port 0 clock frequency (Hz)
